@@ -1,0 +1,195 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-primary: #2563eb;
+  --color-bg-base: #f1f5f9;
+  --color-card-base: #ffffff;
+  --color-text-base: #1e293b;
+  --color-text-muted: #64748b;
+  --color-border-base: #e2e8f0;
+  
+  --radius-card: 16px;
+  --radius-inner: 12px;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg-base);
+    color: var(--color-text-base);
+  }
+
+  @media print {
+    /* RESET UNIVERSAL DE IMPRESSÃO */
+    @page {
+      size: A4;
+      margin: 4.5cm 2.54cm 3.5cm 2.54cm;
+    }
+
+    body {
+      background: white !important;
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+    }
+
+    /* Esconder toda a interface do site */
+    body > * {
+      display: none !important;
+    }
+
+    /* Mostrar apenas o container de impressão, injetado na raiz do body para evitar clipping de pais */
+    body > .print-only,
+    #root .print-only {
+      display: block !important;
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: visible !important;
+    }
+
+    /* Reset de alturas em qualquer ancestral para garantir fluxo multi-página */
+    #root, #root * {
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+      display: block !important;
+    }
+
+    .no-print {
+      display: none !important;
+    }
+
+    /* Papel Timbrado Fixo em TODAS as páginas */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 210mm;
+      height: 297mm;
+      background-image: url('/timbrado.png') !important;
+      background-size: 210mm 297mm !important;
+      background-repeat: no-repeat !important;
+      background-position: top center;
+      z-index: -1000;
+      pointer-events: none;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+
+  .print-only {
+    display: none;
+  }
+}
+
+/* Estilos do Documento (Simulação e Impressão) */
+.print-document {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 11pt; /* Ajustado para 11pt para melhor leitura */
+  line-height: 1.5;
+  color: black;
+  text-align: justify;
+}
+
+/* Na tela (Preview) */
+.preview-document-container {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 4.5cm 2.54cm 3.5cm 2.54cm;
+  background-color: white;
+  background-image: url('/timbrado.png');
+  background-size: 210mm 297mm;
+  background-repeat: no-repeat;
+  background-position: top center;
+  box-shadow: 0 0 20px rgba(0,0,0,0.1);
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* Na Impressão (Remover padding pois o @page margin já cuida disso) */
+@media print {
+  .print-document {
+    width: 100% !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+}
+
+/* Scrollbar styling */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.preview-scale {
+  transform: scale(0.6);
+  transform-origin: top center;
+}
+
+@media (min-width: 1280px) {
+  .preview-scale {
+    transform: scale(0.75);
+  }
+}
+
+@media (min-width: 1536px) {
+  .preview-scale {
+    transform: scale(0.85);
+  }
+}
+
+.print-document h1 {
+  font-size: 10pt;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 1.5em;
+}
+
+.print-document .header-field {
+  margin-bottom: 0.25em;
+  font-weight: bold;
+}
+
+.print-document .section-title {
+  font-weight: bold;
+  margin: 1em 0;
+}
+
+.print-document p {
+  text-indent: 1.25cm;
+  margin-bottom: 0px;
+}
+
+.print-document p.no-indent {
+  text-indent: 0;
+}
+
+.print-document .signature-block {
+  margin-top: 2cm;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.print-document .signature-block .name {
+  font-weight: bold;
+}
