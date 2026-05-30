@@ -69,37 +69,51 @@ export const Editor: React.FC<EditorProps> = ({
     >
       {!compactView && (
         <div className="flex items-center justify-between">
-          <h2 className="text-[13px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-2">
-            Texto Extraído (OCR)
-            <div className="ml-4 flex bg-slate-100 p-1 rounded-lg scale-90">
-              <button
-                onClick={() => setViewMode('form')}
-                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
-                  viewMode === 'form' ? 'bg-white shadow text-primary' : 'text-text-muted hover:text-text-base'
-                }`}
-              >
-                FORMULÁRIO
-              </button>
-              <button
-                onClick={() => setViewMode('text')}
-                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
-                  viewMode === 'text' ? 'bg-white shadow text-primary' : 'text-text-muted hover:text-text-base'
-                }`}
-              >
-                OCR RAW
-              </button>
-              <button
-                onClick={() => setViewMode('json')}
-                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
-                  viewMode === 'json' ? 'bg-white shadow text-primary' : 'text-text-muted hover:text-text-base'
-                }`}
-              >
-                JSON
-              </button>
-            </div>
+          <h2 className="text-[13px] font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
+            Editor de Parecer
           </h2>
         </div>
       )}
+
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex bg-slate-100 p-1 rounded-lg scale-90">
+          <button
+            onClick={() => setViewMode('form')}
+            className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+              viewMode === 'form' ? 'bg-white shadow text-[#2563eb]' : 'text-[#64748b] hover:text-[#0f172a]'
+            }`}
+          >
+            FORMULÁRIO
+          </button>
+          {content && (
+            <button
+              onClick={() => setViewMode('text')}
+              className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+                viewMode === 'text' ? 'bg-white shadow text-[#2563eb]' : 'text-[#64748b] hover:text-[#0f172a]'
+              }`}
+            >
+              TEXTO EXTRAÍDO
+            </button>
+          )}
+          <button
+            onClick={() => setViewMode('json')}
+            className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+              viewMode === 'json' ? 'bg-white shadow text-[#2563eb]' : 'text-[#64748b] hover:text-[#0f172a]'
+            }`}
+          >
+            DADOS (JSON)
+          </button>
+        </div>
+        {viewMode === 'text' && content && (
+          <button
+            onClick={copyToClipboard}
+            className="text-[10px] font-bold text-[#2563eb] hover:underline flex items-center gap-1"
+          >
+            {copied ? <Check className="w-3 h-3" /> : <Clipboard className="w-3 h-3" />}
+            {copied ? 'COPIADO' : 'COPIAR TUDO'}
+          </button>
+        )}
+      </div>
 
       <div className="flex-1 min-h-0 relative">
         {viewMode === 'form' ? (

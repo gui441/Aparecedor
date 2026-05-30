@@ -4,6 +4,7 @@ import { Editor } from './components/Editor';
 import { apiService } from './services/api';
 import { AlertCircle, Layout } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { GoogleGenAI, Type } from "@google/genai";
 
 export enum AppStep {
   CHOICE = 'CHOICE',
@@ -98,6 +99,7 @@ export default function App() {
   const [extractedText, setExtractedText] = useState<string>('');
   const [structuredData, setStructuredData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,14 +126,154 @@ export default function App() {
 
   const handleExtraction = async (file: File) => {
     setIsLoading(true);
+    setLoadingMessage('Iniciando...');
     setCurrentStep(AppStep.LOADING);
     setError(null);
     try {
       // Step 1: OCR (Client-side)
-      const { text: rawText } = await apiService.extractText(file);
+      const { text: rawText } = await apiService.extractText(file, (msg) => {
+        setLoadingMessage(msg);
+      });
       setExtractedText(rawText);
 
-      setCurrentStep(AppStep.SETUP); // Go back to setup so user can review/edit
+      // Step 2: Improved Regex & Keyword Extraction (Deterministic/Offline)
+      setLoadingMessage('Localizando padrões...');
+      
+      const text = rawText;
+      
+      // Helper to find text between keywords or after a keyword
+      const findAfter = (keywords: string[], maxLength = 100) => {
+        for (const kw of keywords) {
+          // Escape especial chars and check for optional separators
+          const kwPattern = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const reg = new RegExp(`${kwPattern}\\s*[:.-]*\\s*(.*)`, 'i');
+          const match = text.match(reg);
+          if (match && match[1]) {
+            return match[1].substring(0, maxLength).trim();
+          }
+        }
+        return '';
+      };
+
+      const textNoSpaces = text.replace(/\s+/g, '').toUpperCase();
+
+      const regexData: any = {
+        cnpj: text.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/)?.[0] || '',
+        // Pega valor após "VALOR LIQUIDADO" ou "VALOR"
+        valor: text.match(/(?:VALOR LIQUIDADO|VALOR TOTAL|VALOR)\s*[:.-]*\s*(?:R\$|R\s?\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i)?.[1] || '',
+        // Nota Fiscal no histórico ou campo específico
+        num_nota_fiscal: text.match(/(?:Nota fiscal mercadoria|NF-[eE] n[ºo°]|NF n[ºo°]|NF|N[ºo°]|Nota)\s*[:.]*\s*(\d+)/i)?.[1] || 
+                         textNoSpaces.match(/NOTAFISCALMERCADORIA(\d+)/)?.[1] || '',
+        // Processo no histórico: "Processo Administrativo nº 1305/2025"
+        num_processo: text.match(/(?:Processo Administrativo|Processo)\s*(?:n[ºo°]|n|#)?\s*(\d+[.\/]\d+)/i)?.[1] || 
+                      text.match(/(?:Processo)\s?[:.]?\s?(\d+[.\/]\d+)/i)?.[0] || '',
+        // Empenho no topo: "NOTA DE EMPENHO... 04030006"
+        num_empenho: text.match(/(?:NOTA DE EMPENHO|Empenho|NE)\s*[:.]*\s*(\d+)/i)?.[1] || 
+                     textNoSpaces.match(/EMPENHO[.\:]*(\d+)/)?.[1] || '',
+        // Liquidação no topo: "NOTA DE LIQUIDAÇÃO 06040022" ou flexível para letras espaçadas "N O T A..."
+        num_liquidacao: text.match(/(?:NOTA DE LIQUIDAÇÃO|NOTA DE LIQUIDACAO|Liquidação|Liquidacao|NL)\s*[:.]*\s*(\d+)/i)?.[1] || 
+                        textNoSpaces.match(/LIQUIDA[CÇ][A-Z~^]*O[.\:]*(\d+)/)?.[1] || '',
+        // Contrato no histórico: "Contrato nº 341/2025"
+        num_contrato: text.match(/(?:Contrato)\s*(?:n[ºo°]|n|#)?\s*(\d+[.\/]\d+)/i)?.[1] || '',
+        // Pregão no histórico: "PE nº 046/2025"
+        num_pregao: text.match(/(?:PE|Pregão)\s*(?:n[ºo°]|n|#)?\s*(\d+[.\/]\d+)/i)?.[1] || '',
+        
+        // Complex fields handled by keywords
+        credor: findAfter(['Credor', 'RAZÃO SOCIAL', 'NOME DO CREDOR', 'CONTRATADA', 'EMPRESA'], 60),
+        // No histórico geralmente vem após "referente à"
+        objeto: findAfter(['referente à', 'OBJETO', 'FINALIDADE', 'DESTINAÇÃO'], 180),
+        secretaria: findAfter(['UNIDADE ORÇAMENTÁRIA', 'SECRETARIA', 'ÓRGÃO', 'UNIDADE'], 60)
+      };
+
+      // Limpeza de campos comuns
+      if (regexData.valor && !regexData.valor.startsWith('R$')) {
+        regexData.valor = `R$ ${regexData.valor}`;
+      }
+
+      // Especialização para Barra do Corda (Keywords comuns)
+      if (!regexData.secretaria || regexData.secretaria.length < 5) {
+        if (text.match(/SEMUS|SAÚDE/i)) regexData.secretaria = 'SECRETARIA MUNICIPAL DE SAÚDE';
+        else if (text.match(/SEMED|EDUCAÇÃO|FUNDEB/i)) regexData.secretaria = 'SECRETARIA MUNICIPAL DE EDUCAÇÃO';
+        else if (text.match(/ASSISTÊNCIA SOCIAL|SEMAS/i)) regexData.secretaria = 'SECRETARIA MUNICIPAL DE ASSISTÊNCIA SOCIAL';
+      }
+
+      // Date pre-fill
+      const now = new Date();
+      const initialData = {
+        ...regexData,
+        dia: now.getDate().toString(),
+        mes: now.toLocaleString('pt-BR', { month: 'long' }),
+        ano: now.getFullYear().toString()
+      };
+
+      setStructuredData(initialData);
+
+      // Step 3: AI Structuring (The "Regardless of means" solution)
+      setLoadingMessage('Refinando dados com IA...');
+      
+      try {
+        // Fallback to the user's provided key if environment variable is not set
+        const apiKey = process.env.GEMINI_API_KEY || 'AIzaSyDzua6GSrfPoDNxKiEAFub2I2M5Ae3nyFU';
+        const ai = new GoogleGenAI({ apiKey });
+        
+        const prompt = `Você é um assistente especializado em Controle Interno da Prefeitura de Barra do Corda - MA.
+        Extraia os campos abaixo do texto OCR de um documento (Nota de Empenho, Nota de Liquidação, NF, etc).
+        
+        Campos Necessários:
+        - num_processo: Geralmente no histórico ou próximo a "Processo Administrativo".
+        - num_nota_fiscal: Número da NF ou NF-e.
+        - secretaria: Unidade Orçamentária/Órgão.
+        - num_contrato: Número do contrato no histórico.
+        - num_pregao: Número do Pregão (PE) no histórico.
+        - valor: Valor total/liquidado (Ex: R$ 34.923,00).
+        - credor: Razão Social da empresa.
+        - cnpj: CNPJ da empresa.
+        - objeto: Resumo do que está sendo pago/comprado.
+        - num_empenho: Número da Nota de Empenho (geralmente no topo).
+        - num_liquidacao: Número da Nota de Liquidação (geralmente no topo).
+
+        Texto OCR:
+        ${rawText}`;
+
+        const aiResult = await ai.models.generateContent({ 
+          model: "gemini-1.5-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                num_processo: { type: Type.STRING },
+                num_nota_fiscal: { type: Type.STRING },
+                secretaria: { type: Type.STRING },
+                num_contrato: { type: Type.STRING },
+                num_pregao: { type: Type.STRING },
+                valor: { type: Type.STRING },
+                credor: { type: Type.STRING },
+                cnpj: { type: Type.STRING },
+                objeto: { type: Type.STRING },
+                num_empenho: { type: Type.STRING },
+                num_liquidacao: { type: Type.STRING },
+              }
+            }
+          }
+        });
+
+        const aiStructured = JSON.parse(aiResult.text || '{}');
+        
+        // Update with AI data, keeping date context
+        setStructuredData((prev: any) => ({
+          ...prev,
+          ...aiStructured,
+          dia: prev.dia,
+          mes: prev.mes,
+          ano: prev.ano
+        }));
+      } catch (aiErr) {
+        console.warn('AI structuring failed, using regex results:', aiErr);
+      }
+
+      setCurrentStep(AppStep.SETUP);
     } catch (err) {
       console.error('Extraction Error:', err);
       const msg = err instanceof Error ? err.message : 'Falha ao processar dados.';
@@ -242,7 +384,7 @@ export default function App() {
                     <div>
                       <h3 className="text-2xl font-bold text-[#1e293b] mb-2">Usar Imagem (OCR)</h3>
                       <p className="text-[#64748b] leading-relaxed">
-                        Faça upload de uma foto ou scan de um documento para ler seus textos na tela e copiar rapidamente.
+                        Faça upload de uma foto ou scan de um documento. Nossa IA extrairá os dados automaticamente.
                       </p>
                     </div>
                     <div className="mt-4 px-8 py-3 bg-[#2563eb] text-white rounded-2xl font-bold group-hover:bg-[#1d4ed8] transition-colors">
@@ -301,7 +443,7 @@ export default function App() {
                       </div>
                       <FileUpload onFileSelect={handleExtraction} isLoading={isLoading} />
                       <p className="text-[10px] text-[#94a3b8] mt-4 leading-relaxed italic">
-                        * O upload da imagem fará a extração do texto (OCR). Você poderá preencher a tabela visualizando o texto extraído.
+                        * O upload da imagem preenche automaticamente a tabela à direita usando Inteligência Artificial.
                       </p>
                     </div>
 
@@ -373,6 +515,9 @@ export default function App() {
                   </div>
                 </div>
                 <h2 className="text-2xl font-bold text-[#1e293b] mb-2">Processando Documento</h2>
+                <p className="text-[#2563eb] font-bold text-sm mb-2 uppercase tracking-tight">
+                  {loadingMessage}
+                </p>
                 <p className="text-[#64748b] max-w-[300px] leading-relaxed">
                   Lendo o conteúdo do documento para a sua tela de preenchimento...
                 </p>
