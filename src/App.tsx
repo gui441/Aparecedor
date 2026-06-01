@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileUpload } from './components/FileUpload';
+import { ScannerFolderConfig } from './components/ScannerFolderConfig';
 import { Editor } from './components/Editor';
 import { apiService } from './services/api';
-import { AlertCircle, Layout } from 'lucide-react';
+import { AlertCircle, Layout, Printer, Info, Sparkles, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from "@google/genai";
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
 
 export enum AppStep {
   CHOICE = 'CHOICE',
@@ -13,8 +16,69 @@ export enum AppStep {
   RESULT = 'RESULT'
 }
 
-const ReportDocument = ({ structuredData }: { structuredData: any }) => (
-  <div className="print-document">
+export function cleanSecretaria(sec: string): string {
+  if (!sec) return '';
+  let cleaned = sec.trim();
+  
+  // Remove Prefeitura municipal prefixes if extracted
+  cleaned = cleaned.replace(/^(prefeitura\s+municipal\s+de\s+barra\s+do\s+corda(?: - ma)?|prefeitura\s+municipal\s+de\s+|prefeitura\s+municipal\s+|prefeitura\s+de\s+barra\s+do\s+corda)/i, '');
+  
+  // Remove Secretaria prefixes
+  cleaned = cleaned.replace(/^(secretaria\s+municipal\s+adjunta\s+de\s+|secretaria\s+municipal\s+de\s+|secretaria\s+adjunta\s+de\s+|secretaria\s+de\s+|secretaria\s+municipal\s+|secretaria\s+|sec\.\s+municipal\s+de\s+|sec\.\s+de\s+|sec\s+de\s+|secreteria\s+municipal\s+de\s+|secreteria\s+de\s+|secreteria\s+)/i, '');
+  
+  cleaned = cleaned.trim();
+  
+  // Format to standard capitalization if the input is mostly uppercase
+  if (cleaned && cleaned === cleaned.toUpperCase()) {
+    cleaned = cleaned.toLowerCase().replace(/(?:^|\s)\S/g, (a) => a.toUpperCase());
+    const pregs = [' De ', ' Do ', ' Da ', ' Dos ', ' Das ', ' E ', ' Ao ', ' Aos ', ' Em ', ' No ', ' Nos '];
+    pregs.forEach(preg => {
+      cleaned = cleaned.replace(new RegExp(preg, 'g'), preg.toLowerCase());
+    });
+  }
+  
+  return cleaned;
+}
+
+export function cleanObjeto(obj: string): string {
+  if (!obj) return '';
+  let cleaned = obj.trim();
+
+  // Pattern matching variations like "para atender as necessidades da secretaria...", "destinado à secretaria...", "para a secretaria..."
+  // Portuguese patterns: "para atender...", "destinado à...", "atender a...", "para a...", "da secretaria..."
+  const patterns = [
+    /\s*(?:para\s+)?atenders?\s+(?:as|às|a|o|os)?\s*(?:necessidades|demandas)?\s*(?:da|do)?\s*(?:secretaria|sec\.|subsecretaria|prefeitura|órgão|fundo|departamento|coordenação|setores|setor)[\s\S]*$/i,
+    /\s*destinados?\s+(?:à|a|ao|aos)?\s*(?:secretaria|sec\.|prefeitura|departamento|setores|setor)[\s\S]*$/i,
+    /\s*(?:para\s+)?uso\s+(?:na|no|da|do)?\s*(?:secretaria|sec\.|prefeitura|departamento|setores|setor)[\s\S]*$/i,
+    /\s*(?:para|em\s+prol\s+de)\s+(?:a|o|as|os)?\s*(?:secretaria|sec\.|prefeitura|departamento|setores|setor)[\s\S]*$/i,
+    /\s*vinculados?\s+(?:à|a|ao|aos)?\s*(?:secretaria|sec\.|prefeitura|departamento|setores|setor)[\s\S]*$/i,
+    /\s+junto\s+à\s*(?:secretaria|sec\.|prefeitura|departamento)[\s\S]*$/i,
+    /\s*(?:destinada|destinado)\s+a\s+atender[\s\S]*$/i,
+    /\s+para\s+esta\s+secretaria[\s\S]*$/i,
+    /\s+da\s+(?:secretaria|sec\.|prefeitura)[\s\S]*$/i,
+  ];
+
+  patterns.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, '');
+  });
+
+  // Remove trailing prepositions/punctuation that might remain after splitting
+  cleaned = cleaned.replace(/,\s*$/g, '')
+                   .replace(/;\s*$/g, '')
+                   .replace(/\s+para\s*$/gi, '')
+                   .replace(/\s+de\s*$/gi, '')
+                   .replace(/\s+da\s*$/gi, '')
+                   .replace(/\s+do\s*$/gi, '')
+                   .replace(/\s+com\s*$/gi, '')
+                   .replace(/\s+em\s*$/gi, '')
+                   .replace(/\s*-\s*$/g, '')
+                   .trim();
+
+  return cleaned;
+}
+
+const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
+  <>
     <h1>PARECER DO CONTROLE INTERNO MUNICIPAL</h1>
     
     <div className="header-field">Assunto: Análise do Processo Administrativo n.º {structuredData.num_processo}</div>
@@ -29,7 +93,7 @@ const ReportDocument = ({ structuredData }: { structuredData: any }) => (
     <div className="section-title">I - RELATÓRIO</div>
     
     <p>
-      Veio ao conhecimento desta Controladoria Geral do Município de Barra Do Corda/MA, o Processo de Pagamento referente a Nota Fiscal de n.º <b>{structuredData.num_nota_fiscal}</b>, que tem como credor a empresa <b>{structuredData.credor}</b>, portadora do CNPJ <b>{structuredData.cnpj}</b>, contrato que tem como objeto {structuredData.objeto}, para atendimento das demandas da Secretaria de {structuredData.secretaria} do município de Barra do Corda - MA, para análise quanto a legalidade e verificação das demais formalidades, a fim de executar o respectivo pagamento.
+      Veio ao conhecimento desta Controladoria Geral do Município de Barra Do Corda/MA, o Processo de Pagamento referente a Nota Fiscal de n.º <b>{structuredData.num_nota_fiscal}</b>, que tem como credor a empresa <b>{structuredData.credor}</b>, portadora do CNPJ <b>{structuredData.cnpj}</b>, contrato que tem como objeto {structuredData.objeto}, para satisfazer as necessidades da Secretaria de {structuredData.secretaria} do município de Barra do Corda - MA, para análise quanto a legalidade e verificação das demais formalidades, a fim de executar o respectivo pagamento.
     </p>
 
     <div className="section-title">II - DA ANÁLISE DOS DOCUMENTOS ANEXADOS</div>
@@ -39,24 +103,29 @@ const ReportDocument = ({ structuredData }: { structuredData: any }) => (
     </p>
     
     <div className="space-y-0 text-[10pt] mb-6">
-      <div>01. Solicitação de Pagamento;</div>
-      <div>02. Cópia do Extrato do Contrato;</div>
-      <div>03. Comprovante de Publicação;</div>
-      <div>04. Nota de Empenho n.º {structuredData.num_empenho}</div>
-      <div>05. Nota de Liquidação n.º {structuredData.num_liquidacao};</div>
-      <div>06. Nota Fiscal n.º {structuredData.num_nota_fiscal}, validada e atestada;</div>
-      <div>07. Ordem de Fornecimento;</div>
-      <div>08. Certidão Positiva com Efeitos de Negativa de Débitos Relativos aos Tributos Federais e à Dívida Ativa da União;</div>
-      <div>09. Certidão Negativa de Débitos Trabalhistas;</div>
-      <div>10. Certidão Negativa de Débitos Estadual;</div>
-      <div>11. Certidão Negativa de Dívida Ativa Estadual;</div>
-      <div>12. Certidão Negativa de Débitos Municipais;</div>
-      <div>13. Certidão Negativa de Dívida Ativa Municipal;</div>
-      <div>14. Certidão de Regularidade do FGTS;</div>
-      <div>15. Comprovante Sinc;</div>
+      <div>01. Autorização de Pagamento;</div>
+      <div>02. Solicitação de Pagamento;</div>
+      <div>03. Cópia do Extrato do Contrato;</div>
+      <div>04. Comprovante de Publicação;</div>
+      <div>05. Nota de Empenho n.º {structuredData.num_empenho}</div>
+      <div>06. Nota de Liquidação n.º {structuredData.num_liquidacao};</div>
+      <div>07. Nota Fiscal n.º {structuredData.num_nota_fiscal}, validada e atestada;</div>
+      <div>08. Ordem de Fornecimento;</div>
+      <div>09. Certidão Positiva com Efeitos de Negativa de Débitos Relativos aos Tributos Federais e à Dívida Ativa da União;</div>
+      <div>10. Certidão Negativa de Débitos Trabalhistas;</div>
+      <div>11. Certidão Negativa de Débitos Estadual;</div>
+      <div>12. Certidão Negativa de Dívida Ativa Estadual;</div>
+      <div>13. Certidão Negativa de Débitos Municipais;</div>
+      <div>14. Certidão Negativa de Dívida Ativa Municipal;</div>
+      <div>15. Certidão de Regularidade do FGTS;</div>
+      <div>16. Comprovante Sinc;</div>
     </div>
+  </>
+);
 
-    <p>
+const ReportPage2 = ({ structuredData }: { structuredData: any }) => (
+  <>
+    <p className="no-indent">
       Após verificação de todos os documentos anexados ao presente processo de pagamento, esta Controladoria Geral do Município de Barra do Corda/MA, conclui:
     </p>
 
@@ -87,8 +156,19 @@ const ReportDocument = ({ structuredData }: { structuredData: any }) => (
 
     <div className="signature-block no-indent">
       <div className="name uppercase">ANDERSON PEREIRA GOMES</div>
-      <div className="text-[10pt] font-bold uppercase">CONTROLADOR VALOR GERAL INTERINO DO MUNICÍPIO</div>
+      <div className="text-[10pt] font-bold uppercase">CONTROLADOR GERAL INTERINO DO MUNICÍPIO</div>
       <div className="text-[10pt] font-bold">Portaria Nº203/2025</div>
+    </div>
+  </>
+);
+
+const ReportDocument = ({ structuredData }: { structuredData: any }) => (
+  <div className="print-document flex flex-col gap-6 no-print-gap">
+    <div className="print-page">
+      <ReportPage1 structuredData={structuredData} />
+    </div>
+    <div className="print-page">
+      <ReportPage2 structuredData={structuredData} />
     </div>
   </div>
 );
@@ -101,7 +181,24 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoPrint, setAutoPrint] = useState<boolean>(() => {
+    return localStorage.getItem('autoPrint') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('autoPrint', autoPrint ? 'true' : 'false');
+  }, [autoPrint]);
+
+  useEffect(() => {
+    if (currentStep === AppStep.RESULT && autoPrint) {
+      const timer = setTimeout(() => {
+        window.print();
+      }, 1000); // 1s buffer for layout stability before print dialogue
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep, autoPrint]);
 
   // Initialize data if null to prevent crashes in Setup
   if (!structuredData && currentStep === AppStep.SETUP) {
@@ -130,12 +227,30 @@ export default function App() {
     setCurrentStep(AppStep.LOADING);
     setError(null);
     try {
-      // Step 1: OCR (Client-side)
-      const { text: rawText } = await apiService.extractText(file, (msg) => {
+      // Step 1: Unified High-Precision OCR (Server-side Gemini or local Tesseract)
+      const { text: rawText, structured: serverStructured } = await apiService.extractText(file, (msg) => {
         setLoadingMessage(msg);
       });
       setExtractedText(rawText);
 
+      const now = new Date();
+
+      if (serverStructured) {
+        // We received perfect structured values directly from the server-side multimodal Gemini OCR!
+        // No client-side regex or second refinement LLM call is required.
+        setStructuredData({
+          ...serverStructured,
+          secretaria: cleanSecretaria(serverStructured.secretaria),
+          dia: now.getDate().toString(),
+          mes: now.toLocaleString('pt-BR', { month: 'long' }),
+          ano: now.getFullYear().toString()
+        });
+        setCurrentStep(AppStep.SETUP);
+        setIsLoading(false);
+        return;
+      }
+
+      // --- FALLBACK PROCESS (when local Tesseract OCR was utilized) ---
       // Step 2: Improved Regex & Keyword Extraction (Deterministic/Offline)
       setLoadingMessage('Localizando padrões...');
       
@@ -192,15 +307,16 @@ export default function App() {
 
       // Especialização para Barra do Corda (Keywords comuns)
       if (!regexData.secretaria || regexData.secretaria.length < 5) {
-        if (text.match(/SEMUS|SAÚDE/i)) regexData.secretaria = 'SECRETARIA MUNICIPAL DE SAÚDE';
-        else if (text.match(/SEMED|EDUCAÇÃO|FUNDEB/i)) regexData.secretaria = 'SECRETARIA MUNICIPAL DE EDUCAÇÃO';
-        else if (text.match(/ASSISTÊNCIA SOCIAL|SEMAS/i)) regexData.secretaria = 'SECRETARIA MUNICIPAL DE ASSISTÊNCIA SOCIAL';
+        if (text.match(/SEMUS|SAÚDE/i)) regexData.secretaria = 'Saúde';
+        else if (text.match(/SEMED|EDUCAÇÃO|FUNDEB/i)) regexData.secretaria = 'Educação';
+        else if (text.match(/ASSISTÊNCIA SOCIAL|SEMAS/i)) regexData.secretaria = 'Assistência Social';
       }
 
-      // Date pre-fill
-      const now = new Date();
+      // Date pre-fill and clean
       const initialData = {
         ...regexData,
+        secretaria: cleanSecretaria(regexData.secretaria),
+        objeto: cleanObjeto(regexData.objeto),
         dia: now.getDate().toString(),
         mes: now.toLocaleString('pt-BR', { month: 'long' }),
         ano: now.getFullYear().toString()
@@ -217,18 +333,25 @@ export default function App() {
         const ai = new GoogleGenAI({ apiKey });
         
         const prompt = `Você é um assistente especializado em Controle Interno da Prefeitura de Barra do Corda - MA.
-        Extraia os campos abaixo do texto OCR de um documento (Nota de Empenho, Nota de Liquidação, NF, etc).
-        
+        Sua tarefa é extrair e corrigir ortograficamente os campos abaixo do texto OCR de um documento (Nota de Empenho, Nota de Liquidação, NF, etc).
+
+        Durante a extração, você deve aplicar automaticamente uma camada silenciosa de correção ortográfica e aprimoramento linguístico nos campos estruturados:
+        1. Grafia de Secretarias: Você deve extrair o NOME ESPECÍFICO do órgão municipal, IGNORANDO e OMITINDO totalmente prefixos redundantes como "Secretaria de", "Secretaria Municipal de", "SEC DE", "SEC MUNICIPAL DE" e semelhantes. Por exemplo, se for "Secretaria Municipal de Saúde", extraia e preencha APENAS "Saúde". Ajuste para Capitalização Adequada.
+        2. Grafia de Credor: Corrija a grafia de nomes próprios, palavras como "LTDA", "S/A", "ME", garantindo que estejam formatadas profissionalmente em maiúsculas se cabível, sem abreviações estranhas geradas pelo OCR.
+        3. Objeto do Parecer/Contrato: Corrija a concordância, acentuação, exclua lixo de digitalização ou caracteres avulsos. Complete termos truncados (ex: prestacao -> prestação, aquisicao -> aquisição, manutencao -> manutenção). ATENÇÃO CRÍTICA: Não cite de forma alguma a secretaria atendida ou destinatária no objeto. Ignore, omita ou retire trechos como "para atender as necessidades da Secretaria Municipal de Saúde", "destinado à Secretaria...", "para a secretaria...", etc. Deixe somente a ação/item em si (ex: se for "Aquisição de peças para a Secretaria de Educação", deixe apenas "Aquisição de peças").
+        4. Números e Valores: Preserve integralmente quaisquer números reais de CPF, CNPJ, empenho, contratos e processos rasteados. Apenas remova ruídos de pontuação inadequados.
+        5. Preservação Factual: Em hipótese alguma altere valores financeiros reais nem invente fatos novos.
+
         Campos Necessários:
         - num_processo: Geralmente no histórico ou próximo a "Processo Administrativo".
         - num_nota_fiscal: Número da NF ou NF-e.
-        - secretaria: Unidade Orçamentária/Órgão.
+        - secretaria: O nome específico da secretaria (ex: "Saúde", "Educação", "Planejamento, Orçamento e Gestão", "Assistência Social"). Sem prefixos "Secretaria Municipal de".
         - num_contrato: Número do contrato no histórico.
         - num_pregao: Número do Pregão (PE) no histórico.
         - valor: Valor total/liquidado (Ex: R$ 34.923,00).
-        - credor: Razão Social da empresa.
-        - cnpj: CNPJ da empresa.
-        - objeto: Resumo do que está sendo pago/comprado.
+        - credor: Razão Social ou Nome do Credor.
+        - cnpj: CNPJ do Credor.
+        - objeto: Resumo do que está sendo pago/comprado (sem citar qual secretaria está sendo atendida, ex: "Prestação de serviços de limpeza").
         - num_empenho: Número da Nota de Empenho (geralmente no topo).
         - num_liquidacao: Número da Nota de Liquidação (geralmente no topo).
 
@@ -236,7 +359,7 @@ export default function App() {
         ${rawText}`;
 
         const aiResult = await ai.models.generateContent({ 
-          model: "gemini-1.5-flash",
+          model: "gemini-3.5-flash",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -265,6 +388,8 @@ export default function App() {
         setStructuredData((prev: any) => ({
           ...prev,
           ...aiStructured,
+          secretaria: cleanSecretaria(aiStructured.secretaria || prev.secretaria || ''),
+          objeto: cleanObjeto(aiStructured.objeto || prev.objeto || ''),
           dia: prev.dia,
           mes: prev.mes,
           ano: prev.ano
@@ -314,6 +439,78 @@ export default function App() {
     }
   };
 
+  const handleExportPdf = async () => {
+    if (!structuredData) return;
+    setIsExportingPdf(true);
+    setError(null);
+    try {
+      const element = document.querySelector('.preview-document-container');
+      if (!element) {
+        throw new Error('Elemento de visualização do parecer não encontrado.');
+      }
+
+      // Clone original element so web styles like boxShadow, scroll heights don't interfere
+      const clone = element.cloneNode(true) as HTMLElement;
+      clone.style.boxShadow = 'none';
+      clone.style.borderRadius = '0';
+      clone.style.border = 'none';
+      clone.style.margin = '0';
+      
+      // Remove gaps and shadow constraints on clone for a seamless 1:1 scale export
+      const printDoc = clone.querySelector('.print-document') as HTMLElement;
+      if (printDoc) {
+        printDoc.style.gap = '0';
+        printDoc.style.display = 'block';
+      }
+      
+      const pages = clone.querySelectorAll('.print-page');
+      pages.forEach((page) => {
+        (page as HTMLElement).style.boxShadow = 'none';
+        (page as HTMLElement).style.margin = '0';
+      });
+      
+      const credorText = (structuredData.credor || 'Final').trim();
+      const nfText = (structuredData.num_nota_fiscal || '000').trim();
+      const valorText = (structuredData.valor || '0,00').trim();
+      
+      const fileName = `PARECER ${credorText} - R$ ${valorText} - NF ${nfText}.pdf`
+        .replace(/[/\\?%*:|"<>]/g, '-');
+
+      const opt = {
+        margin:       0,
+        filename:     fileName,
+        image:        { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas:  { 
+          scale: 2, 
+          useCORS: true, 
+          letterRendering: true,
+          logging: false
+        },
+        jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
+        pagebreak:    { mode: 'css' }
+      };
+
+      // Append clone to body off-screen to guarantee correct styling and font resolution
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.top = '-9999px';
+      container.appendChild(clone);
+      document.body.appendChild(container);
+
+      // Run html2pdf and download
+      await html2pdf().set(opt).from(clone).save();
+      
+      // Clean up DOM
+      document.body.removeChild(container);
+    } catch (err) {
+      console.error('Pdf export error:', err);
+      setError(`Falha ao exportar PDF: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const goToResult = () => {
     setCurrentStep(AppStep.RESULT);
     handleExport(); // Iniciar download automático ao gerar
@@ -330,16 +527,21 @@ export default function App() {
 
   return (
     <>
-      <div className="flex flex-col h-screen overflow-hidden bg-[#f1f5f9] text-[#0f172a] font-sans">
+      <div className="no-print flex flex-col h-screen overflow-hidden bg-[#f1f5f9] text-[#0f172a] font-sans">
       <div className="no-print flex flex-col h-full overflow-hidden">
         {/* Header */}
-        <header className="h-16 shrink-0 bg-white border-b border-[#e2e8f0] px-8 flex items-center justify-between z-10 shadow-sm">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-bold tracking-tight text-[#2563eb] flex items-center gap-2">
-              <span className="text-xl">📄</span> Extrator Pro <span className="font-normal text-[#64748b] ml-1">/ Parecer Municipal</span>
+        <header className="h-16 shrink-0 bg-white border-b border-[#e2e8f0] px-8 flex items-center justify-between z-10 shadow-sm relative">
+          <div className="w-1/3 flex justify-start">
+            {/* Left slot empty to allow true centering */}
+          </div>
+          
+          <div className="absolute inset-x-0 mx-auto flex justify-center pointer-events-none">
+            <h1 className="text-xl font-extrabold tracking-widest text-slate-800 select-none pointer-events-auto">
+              APARECEDOR
             </h1>
           </div>
-          <div className="flex items-center gap-5">
+          
+          <div className="w-1/3 flex justify-end items-center gap-5">
             {currentStep !== AppStep.CHOICE && (
               <>
                 <div className="flex gap-1">
@@ -368,11 +570,6 @@ export default function App() {
                 exit={{ opacity: 0, y: -20 }}
                 className="h-full flex flex-col items-center justify-center p-6 max-w-4xl mx-auto w-full"
               >
-                <div className="text-center mb-12">
-                  <h2 className="text-3xl font-bold text-[#1e293b] mb-4">Como você deseja começar?</h2>
-                  <p className="text-[#64748b] text-lg">Escolha o método de entrada para gerar seu Parecer Municipal.</p>
-                </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
                   <button 
                     onClick={() => startWithMode('image')}
@@ -382,10 +579,7 @@ export default function App() {
                       📸
                     </div>
                     <div>
-                      <h3 className="text-2xl font-bold text-[#1e293b] mb-2">Usar Imagem (OCR)</h3>
-                      <p className="text-[#64748b] leading-relaxed">
-                        Faça upload de uma foto ou scan de um documento. Nossa IA extrairá os dados automaticamente.
-                      </p>
+                      <h3 className="text-2xl font-bold text-[#1e293b]">Usar Imagem (OCR)</h3>
                     </div>
                     <div className="mt-4 px-8 py-3 bg-[#2563eb] text-white rounded-2xl font-bold group-hover:bg-[#1d4ed8] transition-colors">
                       Selecionar Imagem
@@ -400,10 +594,7 @@ export default function App() {
                       ⌨️
                     </div>
                     <div>
-                      <h3 className="text-2xl font-bold text-[#1e293b] mb-2">Usar Formulário</h3>
-                      <p className="text-[#64748b] leading-relaxed">
-                        Preencha os dados manualmente em um formulário estruturado para gerar seu parecer.
-                      </p>
+                      <h3 className="text-2xl font-bold text-[#1e293b]">Usar Formulário</h3>
                     </div>
                     <div className="mt-4 px-8 py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold group-hover:bg-slate-200 transition-colors">
                       Preencher Formulário
@@ -424,28 +615,39 @@ export default function App() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
-                className={`h-full grid grid-cols-1 ${selectedMode === 'image' ? 'md:grid-cols-[400px_1fr]' : 'md:grid-cols-1 max-w-[900px]'} gap-6 p-6 overflow-hidden mx-auto w-full`}
+                className={
+                  selectedMode === 'image'
+                    ? extractedText
+                      ? "h-full grid grid-cols-1 md:grid-cols-[400px_1fr] gap-6 p-6 overflow-hidden mx-auto w-full"
+                      : "h-full flex flex-col justify-center items-center max-w-[550px] p-6 overflow-y-auto mx-auto w-full gap-6"
+                    : "h-full grid grid-cols-1 max-w-[900px] gap-6 p-6 overflow-hidden mx-auto w-full"
+                }
               >
                 {/* Left: Upload (Only if image mode selected) */}
                 {selectedMode === 'image' && (
-                  <div className="flex flex-col gap-6 overflow-auto">
+                  <div className={`flex flex-col gap-6 overflow-auto ${!extractedText ? 'w-full' : ''}`}>
                     <div className="bg-white rounded-[24px] border border-[#e2e8f0] p-6 shadow-sm">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-[#64748b]">
                           1. Capturar Imagem
                         </h2>
                         <button 
-                          onClick={() => setCurrentStep(AppStep.CHOICE)}
+                          onClick={() => {
+                            setExtractedText('');
+                            setCurrentStep(AppStep.CHOICE);
+                          }}
                           className="text-[10px] font-bold text-[#2563eb] hover:underline uppercase"
                         >
                           Alterar Modo
                         </button>
                       </div>
                       <FileUpload onFileSelect={handleExtraction} isLoading={isLoading} />
-                      <p className="text-[10px] text-[#94a3b8] mt-4 leading-relaxed italic">
-                        * O upload da imagem preenche automaticamente a tabela à direita usando Inteligência Artificial.
+                      <p className="text-[10px] text-[#94a3b8] mt-4 leading-relaxed italic text-center">
+                        * O upload da imagem preenche automaticamente o parecer usando Inteligência Artificial.
                       </p>
                     </div>
+
+                    <ScannerFolderConfig onFileSelect={handleExtraction} isLoading={isLoading} />
 
                     {error && (
                       <motion.div
@@ -460,39 +662,55 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Right: Form */}
-                <div className="bg-white rounded-[24px] border border-[#e2e8f0] p-8 shadow-sm flex flex-col overflow-hidden">
-                  <div className="flex items-center justify-between mb-6 shrink-0">
-                    <div className="flex flex-col">
-                      <h2 className="text-lg font-bold text-[#1e293b]">Dados do Parecer</h2>
-                      {selectedMode === 'form' && (
-                        <button 
-                          onClick={() => setCurrentStep(AppStep.CHOICE)}
-                          className="text-[10px] font-bold text-[#2563eb] hover:underline uppercase text-left"
-                        >
-                          ← Voltar para seleção
-                        </button>
-                      )}
+                {/* Right: Form (Only shown if selectedMode is 'form' OR if selectedMode is 'image' and we have extracted text) */}
+                {(selectedMode === 'form' || (selectedMode === 'image' && extractedText)) && (
+                  <div className="bg-white rounded-[24px] border border-[#e2e8f0] p-8 shadow-sm flex flex-col overflow-hidden">
+                    <div className="flex items-center justify-between mb-6 shrink-0">
+                      <div className="flex flex-col">
+                        <h2 className="text-lg font-bold text-[#1e293b]">Dados do Parecer</h2>
+                        {selectedMode === 'form' && (
+                          <button 
+                            onClick={() => {
+                              setExtractedText('');
+                              setCurrentStep(AppStep.CHOICE);
+                            }}
+                            className="text-[10px] font-bold text-[#2563eb] hover:underline uppercase text-left"
+                          >
+                            ← Voltar para seleção
+                          </button>
+                        )}
+                        {selectedMode === 'image' && extractedText && (
+                          <button 
+                            onClick={() => {
+                              setExtractedText('');
+                              setStructuredData(null);
+                            }}
+                            className="text-[10px] font-bold text-red-600 hover:underline uppercase text-left"
+                          >
+                            ← Limpar e Escanear Outro
+                          </button>
+                        )}
+                      </div>
+                      <button 
+                        onClick={goToResult}
+                        className="bg-[#2563eb] text-[#ffffff] px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-200"
+                      >
+                        Gerar Parecer →
+                      </button>
                     </div>
-                    <button 
-                      onClick={goToResult}
-                      className="bg-[#2563eb] text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-200"
-                    >
-                      Gerar Parecer →
-                    </button>
+                    
+                    <div className="flex-1 overflow-auto pr-2 custom-scrollbar">
+                      <Editor 
+                        content={extractedText} 
+                        structured={structuredData}
+                        onStructuredChange={setStructuredData} 
+                        onExport={() => {}} // Not used here
+                        isExporting={false}
+                        compactView={true}
+                      />
+                    </div>
                   </div>
-                  
-                  <div className="flex-1 overflow-auto pr-2 custom-scrollbar">
-                    <Editor 
-                      content={extractedText} 
-                      structured={structuredData}
-                      onStructuredChange={setStructuredData} 
-                      onExport={() => {}} // Not used here
-                      isExporting={false}
-                      compactView={true}
-                    />
-                  </div>
-                </div>
+                )}
               </motion.div>
             )}
 
@@ -561,6 +779,17 @@ export default function App() {
 
                 {/* Right: Actions */}
                 <div className="flex flex-col gap-6">
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-700"
+                    >
+                      <AlertCircle className="w-5 h-5 shrink-0" />
+                      <p className="text-xs font-semibold">{error}</p>
+                    </motion.div>
+                  )}
+
                   <div className="bg-white rounded-[24px] border border-[#e2e8f0] p-8 shadow-lg">
                     <h2 className="text-[13px] font-bold uppercase tracking-[0.15em] text-[#64748b] mb-6">
                       Finalizar Documento
@@ -569,40 +798,109 @@ export default function App() {
                       <button
                         onClick={handleExport}
                         disabled={isExporting}
-                        className="group w-full h-[80px] rounded-2xl bg-[#2563eb] text-white flex items-center px-6 gap-5 hover:bg-blue-700 transition-all active:scale-95 shadow-xl shadow-blue-100 disabled:opacity-50"
+                        className="group w-full h-[80px] rounded-2xl bg-[#2563eb] text-white flex items-center px-6 gap-5 hover:bg-blue-700 transition-all active:scale-95 shadow-xl shadow-blue-100 disabled:opacity-50 cursor-pointer"
                       >
                         <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
                           💾
                         </div>
                         <div className="text-left">
-                          <div className="font-bold text-lg">{isExporting ? 'Gerando arquivo...' : 'Baixar Parecer (.docx)'}</div>
+                          <div className="font-bold text-lg">{isExporting ? 'Gerando Word...' : 'Baixar Parecer (.docx)'}</div>
                           <div className="text-[12px] opacity-70">Download automático iniciado</div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={handleExportPdf}
+                        disabled={isExportingPdf}
+                        className="group w-full h-[80px] rounded-2xl bg-[#ef4444] text-white flex items-center px-6 gap-5 hover:bg-red-600 transition-all active:scale-95 shadow-xl shadow-red-100 disabled:opacity-50 cursor-pointer"
+                      >
+                        <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                          📕
+                        </div>
+                        <div className="text-left">
+                          <div className="font-bold text-lg">{isExportingPdf ? 'Gerando PDF...' : 'Baixar Parecer (PDF)'}</div>
+                          <div className="text-[12px] opacity-70">Fiel à formatação oficial (DOCX)</div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => window.print()}
+                        className="group w-full h-[80px] rounded-2xl bg-emerald-600 text-white flex items-center px-6 gap-5 hover:bg-emerald-700 transition-all active:scale-95 shadow-xl shadow-emerald-100 cursor-pointer"
+                      >
+                        <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                          🖨️
+                        </div>
+                        <div className="text-left">
+                          <div className="font-bold text-lg">Imprimir Parecer</div>
+                          <div className="text-[12px] opacity-70">Nativo e em alta definição</div>
                         </div>
                       </button>
                     </div>
 
+                    {/* Impressão Inteligente e Automática */}
+                    <div className="mt-6 pt-6 border-t border-[#f1f5f9] text-left">
+                      <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                        <div className="flex-1 pr-4">
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-700 uppercase tracking-wider mb-0.5">
+                            <Sparkles className="w-4.5 h-4.5 text-emerald-500 animate-pulse" /> Auto-Impressão
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-snug">
+                            Se ativado, abrirá a tela do sistema para impressão física assim que gerar o parecer.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setAutoPrint(!autoPrint)}
+                          role="switch"
+                          aria-checked={autoPrint}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            autoPrint ? 'bg-emerald-500' : 'bg-slate-200'
+                          }`}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              autoPrint ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Collapse explicativo de Impressão Física Silenciosa (Zero Cliques) */}
+                      <div className="mt-4 bg-blue-50/60 border border-blue-100/40 rounded-2xl p-4">
+                        <div className="flex gap-2.5">
+                          <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="text-xs font-bold text-blue-900 mb-1">Como ter Impressão Silenciosa (Zero Cliques)?</h4>
+                            <p className="text-[10px] text-blue-800 leading-relaxed">
+                              Por limitações de segurança dos navegadores, a impressão direta requer confirmação preliminar. Porém, você pode ignorar essa etapa e fazer seu computador imprimir <strong>instantaneamente de forma física</strong>:
+                            </p>
+                            <ol className="list-decimal list-inside text-[9.5px] text-blue-800 mt-2 space-y-1 ml-1">
+                              <li>Feche o navegador completamente;</li>
+                              <li>Clique com o botão direito no atalho do seu Chrome (ou Edge) e vá em <strong>Propriedades</strong>;</li>
+                              <li>No campo <strong>Destino</strong>, adicione <code className="bg-white/75 px-1 py-0.5 rounded text-red-700 font-mono text-[9px]">--kiosk-printing</code> no final do texto (ex: <code className="bg-white/75 px-1 py-0.5 rounded text-slate-600 font-mono text-[8px]">...chrome.exe" --kiosk-printing</code>);</li>
+                              <li>Abra o navegador por esse atalho. Pronto! Ao clicar em gerar, o computador imprimirá fisicamente sem abrir nenhuma tela!</li>
+                            </ol>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="mt-8 pt-8 border-t border-[#f1f5f9]">
                        <h3 className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-widest mb-4">Outras Opções</h3>
-                       <div className="grid grid-cols-2 gap-3 mb-3">
+                       <div className="grid grid-cols-2 gap-3">
                          <button 
                            onClick={goBackToSetup}
-                           className="h-12 rounded-xl bg-slate-50 border border-border-base text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase"
+                           className="h-12 rounded-xl bg-slate-50 border border-border-base text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
                          >
                            Editar Dados
                          </button>
                          <button 
                            onClick={() => window.location.reload()}
-                           className="h-12 rounded-xl bg-slate-50 border border-border-base text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase"
+                           className="h-12 rounded-xl bg-slate-50 border border-border-base text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
                          >
                            Novo Parecer
                          </button>
                        </div>
-                       <button 
-                         onClick={() => window.print()}
-                         className="w-full h-11 rounded-xl bg-white border border-[#e2e8f0] text-[11px] font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors uppercase flex items-center justify-center gap-2"
-                       >
-                         <span>🖨️</span> Imprimir (Opcional)
-                       </button>
                     </div>
                   </div>
 
