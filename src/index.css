@@ -25,7 +25,7 @@
     /* RESET UNIVERSAL DE IMPRESSÃO */
     @page {
       size: A4;
-      margin: 4.5cm 2.54cm 3.5cm 2.54cm;
+      margin: 0 !important;
     }
 
     body {
@@ -49,7 +49,7 @@
       position: absolute !important;
       left: 0 !important;
       top: 0 !important;
-      width: 100% !important;
+      width: 210mm !important;
       margin: 0 !important;
       padding: 0 !important;
       overflow: visible !important;
@@ -61,24 +61,6 @@
       min-height: 0 !important;
       overflow: visible !important;
       display: block !important;
-    }
-
-    /* Papel Timbrado Fixo em TODAS as páginas */
-    body::before {
-      content: "";
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 210mm;
-      height: 297mm;
-      background-image: url('/timbrado.png') !important;
-      background-size: 210mm 297mm !important;
-      background-repeat: no-repeat !important;
-      background-position: top center;
-      z-index: -1000;
-      pointer-events: none;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
     }
   }
 
@@ -128,27 +110,33 @@
   break-after: page;
 }
 
-/* Na Impressão (Remover padding, sombra e imagens extras pois o @page margin e o body::before já cuidam disso) */
+/* Na Impressão (Garantir proporção 1:1 milimétrica com a visualização A4) */
 @media print {
   .no-print-gap {
     gap: 0 !important;
   }
   
   .print-document {
-    width: 100% !important;
+    width: 210mm !important;
     padding: 0 !important;
     background: transparent !important;
   }
 
   .print-page {
-    background-image: none !important;
-    background-color: transparent !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    padding: 4.5cm 2.54cm 4.0cm 2.54cm !important;
+    background-image: url('/timbrado.png') !important;
+    background-size: 210mm 297mm !important;
+    background-repeat: no-repeat !important;
+    background-position: top center !important;
+    background-color: white !important;
     box-shadow: none !important;
-    height: auto !important;
-    min-height: 0 !important;
     margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .print-page:not(:last-child) {
