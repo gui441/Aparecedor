@@ -102,7 +102,7 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
       Verifica-se nos autos os documentos que embasaram o presente processo de pagamento, conforme segue:
     </p>
     
-    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[9.5pt] mb-4">
+    <div className="flex flex-col space-y-0.5 text-[9.5pt] mb-4">
       <div>01. Autorização de Pagamento;</div>
       <div>02. Solicitação de Pagamento;</div>
       <div>03. Cópia do Extrato do Contrato;</div>
@@ -111,7 +111,7 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
       <div>06. Nota de Liquidação n.º {structuredData.num_liquidacao};</div>
       <div>07. Nota Fiscal n.º {structuredData.num_nota_fiscal}, validada e atestada;</div>
       <div>08. Ordem de Fornecimento;</div>
-      <div className="leading-tight">09. Certidão Conjunta Federal (Tributos/União);</div>
+      <div>09. Certidão Conjunta Federal (Tributos/União);</div>
       <div>10. Certidão Negativa Trabalhista;</div>
       <div>11. Certidão Negativa Estadual;</div>
       <div>12. Certidão Negativa de Dívida Ativa Estadual;</div>
