@@ -84,7 +84,7 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
     <div className="header-field">Assunto: Análise do Processo Administrativo n.º {structuredData.num_processo}</div>
     <div className="header-field">Objeto: Pagamento da Nota Fiscal n.º {structuredData.num_nota_fiscal}, da Secretaria Municipal de {structuredData.secretaria} desta Municipalidade.</div>
     <div className="header-field">Contrato n.º {structuredData.num_contrato} – Pregão Eletrônico n.º {structuredData.num_pregao}</div>
-    <div className="header-field mb-6">Valor: R$ {structuredData.valor}</div>
+    <div className="header-field mb-3">Valor: R$ {structuredData.valor}</div>
 
     <p>
       O Órgão de Controle Interno da Prefeitura Municipal de Barra do Corda – MA, atendendo o previsto nos Artigos 31 e 74 da Constituição Federal, Artigo 59 da Lei Complementar n.º 101, de 04 de maio de 2000, e demais normas que regulam as atribuições do Sistema de Controle Interno, referentes ao exercício de controle prévio e concomitante dos atos de gestão para análise quanto à legalidade e verificação das demais formalidades, no que tange ao Processo Administrativo, encaminhado pela Secretaria Municipal de {structuredData.secretaria}, referente à solicitação de pagamento das despesas constantes da Nota Fiscal n.º <b>{structuredData.num_nota_fiscal}</b>, em favor da empresa nacional <b>{structuredData.credor}</b>, portadora do CNPJ <b>{structuredData.cnpj}</b>.
@@ -102,20 +102,20 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
       Verifica-se nos autos os documentos que embasaram o presente processo de pagamento, conforme segue:
     </p>
     
-    <div className="space-y-0 text-[10pt] mb-6">
+    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[9.5pt] mb-4">
       <div>01. Autorização de Pagamento;</div>
       <div>02. Solicitação de Pagamento;</div>
       <div>03. Cópia do Extrato do Contrato;</div>
       <div>04. Comprovante de Publicação;</div>
-      <div>05. Nota de Empenho n.º {structuredData.num_empenho}</div>
+      <div>05. Nota de Empenho n.º {structuredData.num_empenho};</div>
       <div>06. Nota de Liquidação n.º {structuredData.num_liquidacao};</div>
       <div>07. Nota Fiscal n.º {structuredData.num_nota_fiscal}, validada e atestada;</div>
       <div>08. Ordem de Fornecimento;</div>
-      <div>09. Certidão Positiva com Efeitos de Negativa de Débitos Relativos aos Tributos Federais e à Dívida Ativa da União;</div>
-      <div>10. Certidão Negativa de Débitos Trabalhistas;</div>
-      <div>11. Certidão Negativa de Débitos Estadual;</div>
+      <div className="leading-tight">09. Certidão Conjunta Federal (Tributos/União);</div>
+      <div>10. Certidão Negativa Trabalhista;</div>
+      <div>11. Certidão Negativa Estadual;</div>
       <div>12. Certidão Negativa de Dívida Ativa Estadual;</div>
-      <div>13. Certidão Negativa de Débitos Municipais;</div>
+      <div>13. Certidão Negativa Municipal;</div>
       <div>14. Certidão Negativa de Dívida Ativa Municipal;</div>
       <div>15. Certidão de Regularidade do FGTS;</div>
       <div>16. Comprovante Sinc;</div>
