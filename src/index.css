@@ -92,7 +92,7 @@
 .print-page {
   width: 210mm;
   height: 297mm;
-  padding: 4.5cm 2.54cm 4.0cm 2.54cm;
+  padding: 4.5cm 2.54cm 8.0cm 2.54cm;
   background-color: white;
   background-image: url('/timbrado.png');
   background-size: 210mm 297mm;
@@ -125,7 +125,7 @@
   .print-page {
     width: 210mm !important;
     height: 297mm !important;
-    padding: 4.5cm 2.54cm 4.0cm 2.54cm !important;
+    padding: 4.5cm 2.54cm 8.0cm 2.54cm !important;
     background-image: url('/timbrado.png') !important;
     background-size: 210mm 297mm !important;
     background-repeat: no-repeat !important;
