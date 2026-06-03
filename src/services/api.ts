@@ -12,38 +12,45 @@ export interface ExtractionResult {
 
 export const apiService = {
   async extractText(file: File, onProgress?: (message: string) => void): Promise<ExtractionResult> {
-    // 1. Try to use the high-precision server-side Gemini OCR first
-    try {
-      console.log('Iniciando OCR de alta fidelidade pelo servidor para o arquivo:', file.name);
-      if (onProgress) onProgress('Processando imagem com IA de alta fidelidade...');
+    // 1. Try to use the high-precision server-side Gemini OCR first if online
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
-      const formData = new FormData();
-      formData.append('image', file);
+    if (isOnline) {
+      try {
+        console.log('Iniciando OCR de alta fidelidade pelo servidor para o arquivo:', file.name);
+        if (onProgress) onProgress('Processando imagem com IA de alta fidelidade...');
 
-      const response = await fetch('/api/extract', {
-        method: 'POST',
-        body: formData,
-      });
+        const formData = new FormData();
+        formData.append('image', file);
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result && result.text) {
-          console.log('Extração e estruturação da IA concluída com sucesso via servidor.');
-          return {
-            text: result.text,
-            structured: result.structured || null
-          };
+        const response = await fetch('/api/extract', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result && result.text) {
+            console.log('Extração e estruturação da IA concluída com sucesso via servidor.');
+            return {
+              text: result.text,
+              structured: result.structured || null
+            };
+          }
         }
+        console.warn('O servidor não respondeu com dados válidos de OCR. Iniciando fallback no cliente...');
+      } catch (serverErr) {
+        console.warn('Erro na requisição de OCR ao servidor, iniciando fallback local:', serverErr);
       }
-      console.warn('O servidor não respondeu com dados válidos de OCR. Iniciando fallback no cliente...');
-    } catch (serverErr) {
-      console.warn('Erro na requisição de OCR ao servidor, iniciando fallback local:', serverErr);
+    } else {
+      console.log('Dispositivo em modo offline. Ignorando chamadas ao servidor e iniciando OCR local imediatamente.');
+      if (onProgress) onProgress('Modo offline detectado. Iniciando OCR local rápido...');
     }
 
     // 2. Client-side fallback compilation with Tesseract (offline or non-configured cases)
     try {
-      console.log('Iniciando OCR local (Tesseract) como fallback...');
-      if (onProgress) onProgress('Preparando imagem localmente...');
+      console.log('Iniciando OCR local (Tesseract) de alta precisão com pré-processamento avançado...');
+      if (onProgress) onProgress('Preparando imagem localmente (Otimizando contraste)...');
 
       // Create a canvas to preprocess the image
       const image = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -81,14 +88,35 @@ export const apiService = {
       // Draw original image scaled
       ctx.drawImage(image, 0, 0, width, height);
 
-      // Preprocessing: Simple grayscale transformation
+      // Preprocessing: High-contrast binarization and adaptive-like thresholding
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
       
+      // Compute average luminance to define base threshold
+      let totalLuminance = 0;
       for (let i = 0; i < data.length; i += 4) {
-        // Grayscale conversion using luminosity weights
+        // Human eye standard luminosity weights: Green is highest, blue is lowest
         const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
         data[i] = data[i + 1] = data[i + 2] = gray;
+        totalLuminance += gray;
+      }
+      
+      const avgLuminance = totalLuminance / (data.length / 4);
+
+      // Binarize/Enhance Contrast: Map values to pure white (background) or pure black (text)
+      // This eliminates yellow paper scanning tints, shadows and noise dynamically
+      for (let i = 0; i < data.length; i += 4) {
+        const v = data[i];
+        let newVal = 128;
+        if (v < avgLuminance * 0.95) {
+          newVal = 0;      // Pure black for letters
+        } else if (v > avgLuminance * 1.05) {
+          newVal = 255;    // Pure white for backgrounds
+        } else {
+          // Sharp threshold contrast scaling for high letter edge definition
+          newVal = ((v - avgLuminance * 0.95) / (avgLuminance * 0.1)) * 255;
+        }
+        data[i] = data[i + 1] = data[i + 2] = newVal;
       }
       ctx.putImageData(imageData, 0, 0);
 
@@ -101,14 +129,14 @@ export const apiService = {
       });
 
       URL.revokeObjectURL(image.src);
-      console.log('Pre-processamento concluído');
+      console.log('Pre-processamento avançado da imagem concluído');
 
       const worker = await createWorker('por', 1, {
         logger: m => {
           console.log('Tesseract:', m);
           if (onProgress && typeof m === 'object' && m !== null) {
             if (m.status === 'recognizing text') {
-              onProgress(`Reconhecendo (Local): ${Math.round(m.progress * 100)}%`);
+              onProgress(`Reconhecendo (Modo Local): ${Math.round(m.progress * 100)}%`);
             } else {
               onProgress(`${m.status}`);
             }
@@ -134,30 +162,36 @@ export const apiService = {
   },
 
   async exportToWord(structured: any, title: string = 'PARECER DO CONTROLE INTERNO MUNICIPAL'): Promise<Blob> {
-    // 1. Try server-side generation first
-    try {
-      console.log('Tentando gerar o documento Word pelo servidor (/api/export)...');
-      const apiResponse = await fetch('/api/export', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ structured, title }),
-      });
+    // 1. Try server-side generation first if online
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
-      if (apiResponse.ok) {
-        const contentType = apiResponse.headers.get('content-type');
-        if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument')) {
-          const blob = await apiResponse.blob();
-          if (blob && blob.size > 0) {
-            console.log('Documento Word gerado com sucesso pelo servidor. Tamanho:', blob.size);
-            return blob;
+    if (isOnline) {
+      try {
+        console.log('Tentando gerar o documento Word pelo servidor (/api/export)...');
+        const apiResponse = await fetch('/api/export', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ structured, title }),
+        });
+
+        if (apiResponse.ok) {
+          const contentType = apiResponse.headers.get('content-type');
+          if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument')) {
+            const blob = await apiResponse.blob();
+            if (blob && blob.size > 0) {
+              console.log('Documento Word gerado com sucesso pelo servidor. Tamanho:', blob.size);
+              return blob;
+            }
           }
         }
+        console.warn('O servidor não retornou um DOCX válido. Iniciando fallback no cliente...');
+      } catch (apiErr) {
+        console.warn('Erro ao conectar ou gerar via servidor, tentando fallback local no cliente:', apiErr);
       }
-      console.warn('O servidor não retornou um DOCX válido. Iniciando fallback no cliente...');
-    } catch (apiErr) {
-      console.warn('Erro ao conectar ou gerar via servidor, tentando fallback local no cliente:', apiErr);
+    } else {
+      console.log('Dispositivo em modo offline. Ignorando exportação de Word pelo servidor e utilizando template local.');
     }
 
     // 2. Client-side fallback compilation

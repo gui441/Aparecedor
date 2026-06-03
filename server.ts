@@ -49,21 +49,21 @@ async function startServer() {
           const mimeType = req.file.mimetype || 'image/jpeg';
 
           const prompt = `Você é um especialista em Controle Interno Municipal da Prefeitura de Barra do Corda - MA.
-Sua tarefa é analisar a imagem fornecida (que pode ser uma Nota de Empenho, Nota de Liquidação, Nota Fiscal ou Recibo) e realizar duas tarefas fundamentais com precisão máxima:
+Sua tarefa é analisar a imagem fornecida (que é tipicamente uma "Nota de Liquidação", "Nota de Empenho", "Nota Fiscal" ou semelhantes) e realizar duas tarefas fundamentais com precisão máxima:
 
 1. Transcrever todo o texto visível na imagem de forma contínua e fiel, sem omissões (esta será a base do OCR).
 2. Localizar, interpretar, extrair e CORRIGIR ortograficamente as seguintes informações cruciais sob um formato JSON estruturado:
-- num_processo: Número do Processo Administrativo (ex: "1305/2025" ou "123/2026"). Geralmente no histórico ou próximo a termos como "Processo Administrativo", "Proc. Adm.".
-- num_nota_fiscal: Número da Nota Fiscal (NF, NF-e, etc).
-- secretaria: O NOME ESPECÍFICO da Secretaria, Órgão ou Unidade Orçamentária/Destinatária (ex: "Saúde", "Educação", "Planejamento, Orçamento e Gestão", "Assistência Social"). ATENÇÃO CRÍTICA: Você deve IGNORAR e OMITIR inteiramente os prefixos "Secretaria Municipal de", "Secretaria de", "SEC DE", "SEC MUNICIPAL DE" e variantes semelhantes. Extraia apenas o nome próprio do órgão, corrigindo a ortografia/acentuação se houver falhas e aplicando padrão de Capitalização Adequada.
-- num_contrato: Número do Contrato.
-- num_pregao: Número do Pregão Eletrônico (PE).
-- valor: O valor total ou valor liquidado do documento (formatado como "R$ X.XXX,XX").
-- credor: Razão Social ou Nome do Credor (a empresa contratada). Corrija erros de grafia, padronizando palavras como "LTDA", "S/A", "ME" em maiúsculas profissionais, sem aspas ruidosas do OCR.
-- cnpj: CNPJ do Credor.
-- objeto: Descrição resumida do objeto, finalidade ou histórico da despesa (ex: aquisição de mantimentos, prestação de serviços, etc). ATENÇÃO CRÍTICA: Você deve IGNORAR, OMITIR ou REMOVER inteiramente do texto do objeto qualquer menção à Secretaria atendida/destinatária. Por exemplo, se o texto original for "Aquisição de combustíveis para atender as necessidades da Secretaria Municipal de Saúde", extraia e preencha APENAS "Aquisição de combustíveis", removendo o trecho residual de vinculação à secretaria. Corrija também a pontuação, exclua lixo de digitalização e corrija acentos (ex: prestacao -> prestação, aquisicao -> aquisição).
-- num_empenho: Número da Nota de Empenho.
-- num_liquidacao: Número da Nota de Liquidação.
+- num_processo: Número do Processo Administrativo (ex: "1.225/2025" ou "1305/2025" ou "2488/2024"). Verifique cuidadosamente a seção "HISTÓRICO" do documento, onde frequentemente consta no formato "Processo Administrativo nº 1.225/2025" ou "Processo administrativo nº 2488/2024". Extraia o número completo com pontos e barras.
+- num_nota_fiscal: Número da Nota Fiscal (NF, NF-e, NFS-e). Na Nota de Liquidação, costuma constar na linha "Nota fiscal mercadoria/servico 2012 série A" ou no histórico "Liquidação de NFS-e nº 2012" ou "NFS-e n° 2012". Extraia apenas o número principal de identificação da NF (ex: "2012").
+- secretaria: O NOME ESPECÍFICO da Secretaria, Órgão ou Unidade Orçamentária/Destinatária (ex: "Saúde", "Educação", "Planejamento, Orçamento e Gestão", "Assistência Social"). ATENÇÃO CRÍTICA: Você deve IGNORAR e OMITIR inteiramente os prefixos "Secretaria Municipal de", "Secretaria de", "SEC DE", "SEC MUNICIPAL DE", "Fundo Municipal de" e variantes semelhantes. Além disso, CORRIJA IMEDIATAMENTE quaisquer erros ou grafias de digitação/OCR como "Assistêcia", "Assistecia", "Secreteria" ou "Fundo Municipal de Assistência Social" para "Assistência Social". Extraia apenas o nome próprio do órgão com Capitalização Adequada.
+- num_contrato: Número do Contrato. Verifique no "HISTÓRICO" onde frequentemente consta como "Contrato nº 02/2025" ou similar.
+- num_pregao: Número do Pregão Eletrônico (PE). Verifique no "HISTÓRICO" onde frequentemente consta como "Pregão Eletrônico nº 70/2024" ou similar.
+- valor: O valor total ou valor liquidado do documento (formatado como "R$ X.XXX,XX"). ATENÇÃO CRÍTICA: Se houver campo "VALOR" no topo do empenho (ex: R$ 15.411,51) e campo "VALOR LIQUIDADO" no corpo/rodapé (ex: 8.785,35), você DEVE dar preferência absoluta e extrair o "VALOR LIQUIDADO" (ex: "R$ 8.785,35"), pois é este o valor efetivo de liquidação em auditoria para o parecer de pagamento.
+- credor: Razão Social ou Nome do Credor (a empresa contratada, ex: "NACIONAL PAX SERVIÇOS PÓSTUMOS LTDA"). Corrija erros de grafia, acentue palavras como "PÓSTUMOS" de forma correta se vier "POSTUMOS" e padronize "LTDA", "S/A", "ME" em maiúsculas profissionais.
+- cnpj: CNPJ do Credor (ex: "30.368.334/0001-83").
+- objeto: Descrição resumida do objeto, finalidade ou histórico da despesa (ex: "fornecimento de bens e serviços fúnebres", "prestação de serviços de limpeza", etc). ATENÇÃO CRÍTICA: Você deve IGNORAR, OMITIR ou REMOVER inteiramente do texto do objeto qualquer menção à Secretaria atendida/destinatária, referências a instrumentos (como contratos/pregões) ou atos subsequentes. Por exemplo, de "referente ao forncimento de bens e serviços fúnebres, para atender as necessidades da Secretaria de Assistêcia Social, conforme contrato...", extraia APENAS "fornecimento de bens e serviços fúnebres". Corrija também a pontuação, exclua ruídos e corrija erros como "forncimento" -> "fornecimento", "aditio" -> "aditivo".
+- num_empenho: Número da Nota de Empenho (ex: "02030003"). Atente para a linha "NOTA DE EMPENHO... 02030003" ou semelhante no documento.
+- num_liquidacao: Número da Nota de Liquidação (ex: "02030027"). Atente para o título principal "NOTA DE LIQUIDAÇÃO 02030027" ou semelhante.
 
 Durante a extração, aplique automaticamente essa camada de correção e polimento ortográfico aos campos estruturados de forma silenciosa e limpa, garantindo preservação absoluta de valores reais e números de auditoria legalmente vinculantes.
 
@@ -227,9 +227,9 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
 Sua missão é corrigir e aprimorar de forma impecável toda a ortografia, pontuação, acentuação, concordância e as maiúsculas/minúsculas dos campos estruturados contidos em um rascunho de parecer administrativo municipal.
 
 Instruções específicas para correção:
-1. Grafia de Secretarias: Remova inteiramente os prefixos "Secretaria de", "Secretaria Municipal de", "SEC DE", "SEC MUNICIPAL DE" e semelhantes. Mantenha e preencha APENAS o nome próprio (ex: "Saúde", "Educação", "Planejamento, Orçamento e Gestão", "Assistência Social"). Ajuste para Capitalização Adequada.
-2. Grafia de Credor (Empresa): Corrija a grafia de nomes próprios, palavras como "LTDA", "S/A", "ME", garantindo que estejam formatadas profissionalmente em maiúsculas se cabível, sem abreviações estranhas geradas pelo OCR.
-3. Objeto do Parecer/Contrato: Corrija a concordância, pontuação, exclua lixo de digitalização ou caracteres avulsos. Complete termos truncados (ex: prestacao -> prestação, aquisicao -> aquisição). ATENÇÃO CRÍTICA: Você deve IGNORAR, OMITIR ou REMOVER inteiramente do texto do objeto qualquer menção à Secretaria atendida/destinatária (ex: de "Aquisição de combustíveis para atender as necessidades da Secretaria Municipal de Saúde", deixe APENAS "Aquisição de combustíveis").
+1. Grafia de Secretarias: Remova inteiramente os prefixos "Secretaria de", "Secretaria Municipal de", "SEC DE", "SEC MUNICIPAL DE" e semelhantes. Mantenha e preencha APENAS o nome próprio (ex: "Saúde", "Educação", "Planejamento, Orçamento e Gestão", "Assistência Social"). Além disso, CORRIJA IMEDIATAMENTE quaisquer erros ou grafias de digitação/OCR como "Assistêcia", "Assistecia", "Secreteria" ou "Fundo Municipal de Assistência Social" para "Assistência Social". Ajuste para Capitalização Adequada.
+2. Grafia de Credor (Empresa): Corrija a grafia de nomes próprios, palavras como "LTDA", "S/A", "ME", garantindo que estejam formatadas profissionalmente em maiúsculas se cabível, sem abreviações estranhas geradas pelo OCR (ex: de "POSTUMOS" ou "POSTOMUS", corrija para "PÓSTUMOS").
+3. Objeto do Parecer/Contrato: Corrija a concordância, pontuação, exclua lixo de digitalização ou caracteres avulsos. Complete termos truncados e corrija erros como "forncimento" -> "fornecimento", "aditio" -> "aditivo", "prestacao" -> "prestação", "aquisicao" -> "aquisição", "manutencao" -> "manutenção". ATENÇÃO CRÍTICA: Você deve IGNORAR, OMITIR ou REMOVER inteiramente do texto do objeto qualquer menção à Secretaria atendida/destinatária (ex: de "fornecimento de bens e serviços fúnebres, para atender as necessidades da Secretaria de Assistência Social", deixe APENAS "fornecimento de bens e serviços fúnebres").
 4. Unidades e Números: Preserve integralmente quaisquer dígitos referentes a CPF, CNPJ, números de contratos, processos e empenhos. Conserte somente pontuações inadequadas neles, mantendo os dígitos exatos intactos.
 5. Preservação Factual: Em hipótese alguma invente informações novas ou altere valores financeiros, pois são dados de auditoria legalmente vinculantes.
 

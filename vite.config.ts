@@ -32,7 +32,51 @@ export default defineConfig(({mode}) => {
           ]
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,docx}']
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,docx}'],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'jsdelivr-cdn',
+                expiration: {
+                  maxEntries: 100,
+                  maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            },
+            {
+              urlPattern: /^https:\/\/unpkg\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'unpkg-cdn',
+                expiration: {
+                  maxEntries: 100,
+                  maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            },
+            {
+              urlPattern: /^https:\/\/tessdata\.projectnaptha\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'tessdata-naptha',
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            }
+          ]
         }
       })
     ],

@@ -6,6 +6,7 @@ import { apiService } from './services/api';
 import { AlertCircle, Layout, Printer, Info, Sparkles, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from "@google/genai";
+import { valorPorExtenso } from './utils/currency';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 
@@ -20,11 +21,25 @@ export function cleanSecretaria(sec: string): string {
   if (!sec) return '';
   let cleaned = sec.trim();
   
+  // Specific spelling corrections
+  cleaned = cleaned.replace(/assist[êe]cia/i, 'Assistência')
+                   .replace(/assistecia/i, 'Assistência')
+                   .replace(/secreteria/i, 'Secretaria')
+                   .replace(/saude/i, 'Saúde');
+  
   // Remove Prefeitura municipal prefixes if extracted
   cleaned = cleaned.replace(/^(prefeitura\s+municipal\s+de\s+barra\s+do\s+corda(?: - ma)?|prefeitura\s+municipal\s+de\s+|prefeitura\s+municipal\s+|prefeitura\s+de\s+barra\s+do\s+corda)/i, '');
   
   // Remove Secretaria prefixes
   cleaned = cleaned.replace(/^(secretaria\s+municipal\s+adjunta\s+de\s+|secretaria\s+municipal\s+de\s+|secretaria\s+adjunta\s+de\s+|secretaria\s+de\s+|secretaria\s+municipal\s+|secretaria\s+|sec\.\s+municipal\s+de\s+|sec\.\s+de\s+|sec\s+de\s+|secreteria\s+municipal\s+de\s+|secreteria\s+de\s+|secreteria\s+)/i, '');
+  
+  cleaned = cleaned.trim();
+  
+  // Remove FMAS, FMS or similar suffixes
+  cleaned = cleaned.replace(/\s*-\s*FMAS\s*$/i, '')
+                   .replace(/\s*-\s*FMS\s*$/i, '')
+                   .replace(/\s*-\s*FUMAS\s*$/i, '')
+                   .replace(/^(?:Fundo\s+Municipal\s+de\s+)/i, '');
   
   cleaned = cleaned.trim();
   
@@ -44,6 +59,18 @@ export function cleanObjeto(obj: string): string {
   if (!obj) return '';
   let cleaned = obj.trim();
 
+  // Specific common transcription spelling fixes
+  cleaned = cleaned.replace(/forncimento/i, 'fornecimento')
+                   .replace(/forneciment\s/i, 'fornecimento ')
+                   .replace(/aditio/i, 'aditivo')
+                   .replace(/prestaca\s/i, 'prestação ')
+                   .replace(/prestacao/i, 'prestação')
+                   .replace(/aquisicao/i, 'aquisição')
+                   .replace(/aquisiçao/i, 'aquisição');
+
+  // Remove common document history prefixes to keep only the pure action/object
+  cleaned = cleaned.replace(/^(?:liquidação\s+de\s+nf-e\s+n.*?,\s*(?:referente\s+ao\s+|referente\s+a\s+|referente\s+à\s+)?|liquidação\s+de\s+nota\s+fiscal\s+n.*?,\s*(?:referente\s+ao\s+|referente\s+a\s+|referente\s+à\s+)?|referente\s+ao\s+|referente\s+a\s+|referente\s+à\s+|valor\s+que\s+se\s+empenha\s+referente\s+ao\s+|valor\s+que\s+se\s+empenha\s+referente\s+a\s+|pagamento\s+referente\s+ao\s+|pagamento\s+referente\s+a\s+|despesa\s+referente\s+ao\s+|despesa\s+referente\s+a\s+)/i, '');
+
   // Pattern matching variations like "para atender as necessidades da secretaria...", "destinado à secretaria...", "para a secretaria..."
   // Portuguese patterns: "para atender...", "destinado à...", "atender a...", "para a...", "da secretaria..."
   const patterns = [
@@ -56,6 +83,7 @@ export function cleanObjeto(obj: string): string {
     /\s*(?:destinada|destinado)\s+a\s+atender[\s\S]*$/i,
     /\s+para\s+esta\s+secretaria[\s\S]*$/i,
     /\s+da\s+(?:secretaria|sec\.|prefeitura)[\s\S]*$/i,
+    /\s*(?:conforme|conforme\s+a|conforme\s+o)\s+(?:necessidade|solicitação|necessidades|demandas)?\s*(?:da|do|de)?\s*(?:secretaria|sec\.|fundo|unidade|prefeitura|órgão)[\s\S]*$/i,
   ];
 
   patterns.forEach(pattern => {
@@ -74,6 +102,11 @@ export function cleanObjeto(obj: string): string {
                    .replace(/\s*-\s*$/g, '')
                    .trim();
 
+  // If first letter is lowercase and length > 1, capitalize it for professional appearance
+  if (cleaned.length > 1 && cleaned[0] === cleaned[0].toLowerCase() && !cleaned.startsWith('ar-')) {
+    cleaned = cleaned[0].toUpperCase() + cleaned.substring(1);
+  }
+
   return cleaned;
 }
 
@@ -84,7 +117,7 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
     <div className="header-field">Assunto: Análise do Processo Administrativo n.º {structuredData.num_processo}</div>
     <div className="header-field">Objeto: Pagamento da Nota Fiscal n.º {structuredData.num_nota_fiscal}, da Secretaria Municipal de {structuredData.secretaria} desta Municipalidade.</div>
     <div className="header-field">Contrato n.º {structuredData.num_contrato} – Pregão Eletrônico n.º {structuredData.num_pregao}</div>
-    <div className="header-field mb-3">Valor: R$ {structuredData.valor}</div>
+    <div className="header-field mb-3">Valor: {structuredData.valor?.toString().startsWith('R$') ? structuredData.valor : `R$ ${structuredData.valor}`}{structuredData.valor_extenso ? ` (${structuredData.valor_extenso})` : ''}</div>
 
     <p>
       O Órgão de Controle Interno da Prefeitura Municipal de Barra do Corda – MA, atendendo o previsto nos Artigos 31 e 74 da Constituição Federal, Artigo 59 da Lei Complementar n.º 101, de 04 de maio de 2000, e demais normas que regulam as atribuições do Sistema de Controle Interno, referentes ao exercício de controle prévio e concomitante dos atos de gestão para análise quanto à legalidade e verificação das demais formalidades, no que tange ao Processo Administrativo, encaminhado pela Secretaria Municipal de {structuredData.secretaria}, referente à solicitação de pagamento das despesas constantes da Nota Fiscal n.º <b>{structuredData.num_nota_fiscal}</b>, em favor da empresa nacional <b>{structuredData.credor}</b>, portadora do CNPJ <b>{structuredData.cnpj}</b>.
@@ -102,7 +135,7 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
       Verifica-se nos autos os documentos que embasaram o presente processo de pagamento, conforme segue:
     </p>
     
-    <div className="flex flex-col space-y-0.5 text-[9.5pt] mb-4">
+    <div className="document-list mb-4">
       <div>01. Autorização de Pagamento;</div>
       <div>02. Solicitação de Pagamento;</div>
       <div>03. Cópia do Extrato do Contrato;</div>
@@ -186,6 +219,20 @@ export default function App() {
   const [autoPrint, setAutoPrint] = useState<boolean>(() => {
     return localStorage.getItem('autoPrint') === 'true';
   });
+  const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('autoPrint', autoPrint ? 'true' : 'false');
@@ -210,6 +257,7 @@ export default function App() {
       num_contrato: '',
       num_pregao: '',
       valor: '',
+      valor_extenso: '',
       credor: '',
       cnpj: '',
       objeto: '',
@@ -240,6 +288,7 @@ export default function App() {
         // No client-side regex or second refinement LLM call is required.
         setStructuredData({
           ...serverStructured,
+          valor_extenso: valorPorExtenso(serverStructured.valor || ''),
           secretaria: cleanSecretaria(serverStructured.secretaria),
           dia: now.getDate().toString(),
           mes: now.toLocaleString('pt-BR', { month: 'long' }),
@@ -256,12 +305,12 @@ export default function App() {
       
       const text = rawText;
       
-      // Helper to find text between keywords or after a keyword
+      // Helper to find text between keywords or after a keyword with dynamic separators
       const findAfter = (keywords: string[], maxLength = 100) => {
         for (const kw of keywords) {
           // Escape especial chars and check for optional separators
           const kwPattern = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const reg = new RegExp(`${kwPattern}\\s*[:.-]*\\s*(.*)`, 'i');
+          const reg = new RegExp(`${kwPattern}[\\s.:\\-_=]*\\s*(.*)`, 'i');
           const match = text.match(reg);
           if (match && match[1]) {
             return match[1].substring(0, maxLength).trim();
@@ -272,31 +321,51 @@ export default function App() {
 
       const textNoSpaces = text.replace(/\s+/g, '').toUpperCase();
 
+      // Flexible CNPJ extraction that supports space/characters noise from OCR
+      const cnpjRawMatch = text.match(/\d{2}\s*\.?\s*\d{3}\s*\.?\s*\d{3}\s*[\/\s]?\s*\d{4}\s*[\-\s]?\s*\d{2}/)?.[0] || '';
+      const cnpjOnlyDigits = cnpjRawMatch.replace(/\D/g, '');
+      const cleanedCnpj = cnpjOnlyDigits.length === 14 ? 
+        `${cnpjOnlyDigits.substring(0, 2)}.${cnpjOnlyDigits.substring(2, 5)}.${cnpjOnlyDigits.substring(5, 8)}/${cnpjOnlyDigits.substring(8, 12)}-${cnpjOnlyDigits.substring(12, 14)}` : 
+        '';
+
+      // Get valor liquidado first as it represents the actual payment being analyzed, fallback to general value
+      const valorLiquidadoMatch = text.match(/(?:VALOR LIQUIDADO|LIQUIDADO)\s*[\s.:\-_]*\s*(?:R\$\s*|R\s?\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i)?.[1];
+      const valorTotalMatch = text.match(/(?:VALOR TOTAL|VALOR)\s*[\s.:\-_]*\s*(?:R\$\s*|R\s?\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i)?.[1];
+      const finalValor = valorLiquidadoMatch || valorTotalMatch || '';
+
       const regexData: any = {
-        cnpj: text.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/)?.[0] || '',
-        // Pega valor após "VALOR LIQUIDADO" ou "VALOR"
-        valor: text.match(/(?:VALOR LIQUIDADO|VALOR TOTAL|VALOR)\s*[:.-]*\s*(?:R\$|R\s?\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i)?.[1] || '',
-        // Nota Fiscal no histórico ou campo específico
-        num_nota_fiscal: text.match(/(?:Nota fiscal mercadoria|NF-[eE] n[ºo°]|NF n[ºo°]|NF|N[ºo°]|Nota)\s*[:.]*\s*(\d+)/i)?.[1] || 
-                         textNoSpaces.match(/NOTAFISCALMERCADORIA(\d+)/)?.[1] || '',
-        // Processo no histórico: "Processo Administrativo nº 1305/2025"
-        num_processo: text.match(/(?:Processo Administrativo|Processo)\s*(?:n[ºo°]|n|#)?\s*(\d+[.\/]\d+)/i)?.[1] || 
-                      text.match(/(?:Processo)\s?[:.]?\s?(\d+[.\/]\d+)/i)?.[0] || '',
-        // Empenho no topo: "NOTA DE EMPENHO... 04030006"
-        num_empenho: text.match(/(?:NOTA DE EMPENHO|Empenho|NE)\s*[:.]*\s*(\d+)/i)?.[1] || 
+        cnpj: cleanedCnpj,
+        
+        // Pega valor prioritário (liquidado) ou totalizador
+        valor: finalValor,
+        
+        // Nota Fiscal no histórico ou campo específico com suporte a pontos ruidosos (ex: 2.323) e tipos de NF (mercadoria ou serviço)
+        num_nota_fiscal: text.match(/(?:Nota fiscal mercadoria|Nota fiscal servico|NFS-[eE]|NF-[eE]\s*n[ºo°.]|NF\s*n[ºo°.]|NFS-e|NF-e|NF|N[ºo°.]|Nota)\s*[\s.:\-_]*\s*(\d+(?:\.\d+)*)/i)?.[1]?.replace(/\./g, '') || 
+                         textNoSpaces.match(/NOTAFISCAL(?:MERCADORIA|SERVICO)?(\d+)/)?.[1] || '',
+        
+        // Processo no histórico: suportando dots como "1.225/2025" ou "1234/2025"
+        num_processo: text.match(/(?:Processo Administrativo|Processo|Proc\.?\s*Adm\.?)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
+        
+        // Empenho: "NOTA DE EMPENHO... 09030010"
+        num_empenho: text.match(/(?:NOTA\s*DE\s*EMPENHO|Empenho|NE)\s*[\s.:\-_]*\s*(\d+)/i)?.[1] || 
                      textNoSpaces.match(/EMPENHO[.\:]*(\d+)/)?.[1] || '',
-        // Liquidação no topo: "NOTA DE LIQUIDAÇÃO 06040022" ou flexível para letras espaçadas "N O T A..."
-        num_liquidacao: text.match(/(?:NOTA DE LIQUIDAÇÃO|NOTA DE LIQUIDACAO|Liquidação|Liquidacao|NL)\s*[:.]*\s*(\d+)/i)?.[1] || 
+        
+        // Liquidação no topo: "NOTA DE LIQUIDAÇÃO 09030042" ou flexível para letras espaçadas "N O T A..."
+        num_liquidacao: text.match(/(?:NOTA\s*DE\s*LIQUIDA[CÇ]ÃO|NOTA\s*DE\s*LIQUIDACAO|Liquidação|Liquidacao|NL)\s*[\s.:\-_]*\s*(\d+)/i)?.[1] || 
                         textNoSpaces.match(/LIQUIDA[CÇ][A-Z~^]*O[.\:]*(\d+)/)?.[1] || '',
-        // Contrato no histórico: "Contrato nº 341/2025"
-        num_contrato: text.match(/(?:Contrato)\s*(?:n[ºo°]|n|#)?\s*(\d+[.\/]\d+)/i)?.[1] || '',
-        // Pregão no histórico: "PE nº 046/2025"
-        num_pregao: text.match(/(?:PE|Pregão)\s*(?:n[ºo°]|n|#)?\s*(\d+[.\/]\d+)/i)?.[1] || '',
+        
+        // Contrato no histórico: "Contrato nº 446/2025"
+        num_contrato: text.match(/(?:Contrato)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
+        
+        // Pregão no histórico: "Pregão Eletrônico n° 53/2025" ou "PE nº 53/2025"
+        num_pregao: text.match(/(?:PE|Pregão|Pregao)(?:\s+Eletr[ôo]nico)?\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
         
         // Complex fields handled by keywords
         credor: findAfter(['Credor', 'RAZÃO SOCIAL', 'NOME DO CREDOR', 'CONTRATADA', 'EMPRESA'], 60),
-        // No histórico geralmente vem após "referente à"
-        objeto: findAfter(['referente à', 'OBJETO', 'FINALIDADE', 'DESTINAÇÃO'], 180),
+        
+        // No histórico geralmente vem após "referente à", "referente ao", "referente a" ou "HISTÓRICO"
+        objeto: findAfter(['referente ao', 'referente à', 'referente a', 'OBJETO', 'HISTÓRICO', 'HISTORICO', 'HISTÓRIC0', 'FINALIDADE', 'DESTINAÇÃO'], 180),
+        
         secretaria: findAfter(['UNIDADE ORÇAMENTÁRIA', 'SECRETARIA', 'ÓRGÃO', 'UNIDADE'], 60)
       };
 
@@ -315,6 +384,7 @@ export default function App() {
       // Date pre-fill and clean
       const initialData = {
         ...regexData,
+        valor_extenso: valorPorExtenso(regexData.valor || ''),
         secretaria: cleanSecretaria(regexData.secretaria),
         objeto: cleanObjeto(regexData.objeto),
         dia: now.getDate().toString(),
@@ -324,7 +394,15 @@ export default function App() {
 
       setStructuredData(initialData);
 
-      // Step 3: AI Structuring (The "Regardless of means" solution)
+      // Step 3: AI Structuring (The "Regardless of means" solution if online)
+      const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
+      if (!isOnline) {
+        console.log('Modo desplugado (offline): pulando refinamento estrutural com IA para evitar latência de rede/timeouts.');
+        setCurrentStep(AppStep.SETUP);
+        setIsLoading(false);
+        return;
+      }
+
       setLoadingMessage('Refinando dados com IA...');
       
       try {
@@ -385,15 +463,19 @@ export default function App() {
         const aiStructured = JSON.parse(aiResult.text || '{}');
         
         // Update with AI data, keeping date context
-        setStructuredData((prev: any) => ({
-          ...prev,
-          ...aiStructured,
-          secretaria: cleanSecretaria(aiStructured.secretaria || prev.secretaria || ''),
-          objeto: cleanObjeto(aiStructured.objeto || prev.objeto || ''),
-          dia: prev.dia,
-          mes: prev.mes,
-          ano: prev.ano
-        }));
+        setStructuredData((prev: any) => {
+          const rawVal = aiStructured.valor || prev.valor || '';
+          return {
+            ...prev,
+            ...aiStructured,
+            valor_extenso: valorPorExtenso(rawVal),
+            secretaria: cleanSecretaria(aiStructured.secretaria || prev.secretaria || ''),
+            objeto: cleanObjeto(aiStructured.objeto || prev.objeto || ''),
+            dia: prev.dia,
+            mes: prev.mes,
+            ano: prev.ano
+          };
+        });
       } catch (aiErr) {
         console.warn('AI structuring failed, using regex results:', aiErr);
       }
@@ -531,8 +613,11 @@ export default function App() {
       <div className="no-print flex flex-col h-full overflow-hidden">
         {/* Header */}
         <header className="h-16 shrink-0 bg-white border-b border-[#e2e8f0] px-8 flex items-center justify-between z-10 shadow-sm relative">
-          <div className="w-1/3 flex justify-start">
-            {/* Left slot empty to allow true centering */}
+          <div className="w-1/3 flex justify-start items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+            <span className="text-[10px] font-extrabold text-[#64748b] uppercase tracking-wider hidden sm:inline">
+              {isOnline ? 'Online via IA' : 'Modo Local Ativo'}
+            </span>
           </div>
           
           <div className="absolute inset-x-0 mx-auto flex justify-center pointer-events-none">

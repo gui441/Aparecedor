@@ -1,6 +1,7 @@
 import React from 'react';
-import { FileDown, Edit3, Clipboard, Check, Printer } from 'lucide-react';
+import { FileDown, Edit3, Clipboard, Check, Printer, AlertCircle, HelpCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { valorPorExtenso, formatarReal, formatarCNPJ, validarCNPJ } from '../utils/currency';
 
 interface EditorProps {
   content: string;
@@ -15,17 +16,35 @@ interface InputFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   fullWidth?: boolean;
   isTextArea?: boolean;
+  helperText?: string;
+  status?: 'success' | 'warning' | 'error' | null;
 }
 
-const InputField: React.FC<InputFieldProps> = ({ label, value, onChange, fullWidth = false, isTextArea = false }) => (
-  <div className={`${fullWidth ? 'col-span-2' : ''} space-y-1.5`}>
-    <label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider block ml-1">{label}</label>
+const InputField: React.FC<InputFieldProps> = ({ 
+  label, 
+  value, 
+  onChange, 
+  onBlur,
+  fullWidth = false, 
+  isTextArea = false,
+  helperText,
+  status = null
+}) => (
+  <div className={`${fullWidth ? 'col-span-2' : ''} space-y-1`}>
+    <div className="flex justify-between items-center ml-1">
+      <label className="text-[10.5px] font-extrabold text-[#64748b] uppercase tracking-wider block">{label}</label>
+      {status === 'success' && <span className="text-[9.5px] text-emerald-600 font-bold flex items-center gap-0.5">✓ VÁLIDO</span>}
+      {status === 'warning' && <span className="text-[9.5px] text-amber-600 font-semibold flex items-center gap-0.5">⚠ VERIFICAR</span>}
+      {status === 'error' && <span className="text-[9.5px] text-rose-600 font-extrabold flex items-center gap-0.5">✗ IRREGULAR</span>}
+    </div>
     {isTextArea ? (
       <textarea 
         value={value || ''} 
         onChange={(e) => onChange(e.target.value)} 
+        onBlur={onBlur}
         className="w-full p-3 border border-[#e2e8f0] rounded-xl text-sm focus:border-[#2563eb] focus:ring-2 focus:ring-blue-50 outline-none h-24 resize-none transition-all placeholder:text-slate-300"
         placeholder="..."
       />
@@ -33,9 +52,19 @@ const InputField: React.FC<InputFieldProps> = ({ label, value, onChange, fullWid
       <input 
         value={value || ''} 
         onChange={(e) => onChange(e.target.value)} 
-        className="w-full p-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:border-[#2563eb] focus:ring-2 focus:ring-blue-50 outline-none transition-all placeholder:text-slate-300"
+        onBlur={onBlur}
+        className={`w-full p-2.5 border rounded-xl text-sm focus:ring-2 outline-none transition-all placeholder:text-slate-300 ${
+          status === 'error' ? 'border-rose-300 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-50' : 
+          status === 'success' ? 'border-emerald-300 bg-emerald-50/10 focus:border-emerald-500 focus:ring-emerald-50' :
+          'border-[#e2e8f0] focus:border-[#2563eb] focus:ring-blue-50'
+        }`}
         placeholder="..."
       />
+    )}
+    {helperText && (
+      <p className={`text-[10px] leading-tight ml-1.5 italic ${status === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+        {helperText}
+      </p>
     )}
   </div>
 );
@@ -52,13 +81,42 @@ export const Editor: React.FC<EditorProps> = ({
   const [viewMode, setViewMode] = React.useState<'form' | 'text' | 'json'>('form');
 
   const updateField = (field: string, value: string) => {
-    onStructuredChange({ ...structured, [field]: value });
+    let newStructured = { ...structured, [field]: value };
+    
+    // Auto-compute extenso when valor changes
+    if (field === 'valor') {
+      newStructured.valor_extenso = valorPorExtenso(value);
+    }
+    
+    // Auto-format CNPJ on typing (simple numeric limits to avoid cursor jumping)
+    if (field === 'cnpj') {
+      newStructured.cnpj = formatarCNPJ(value);
+    }
+    
+    onStructuredChange(newStructured);
+  };
+
+  const forceFormatValor = () => {
+    if (structured?.valor) {
+      const formatted = formatarReal(structured.valor);
+      onStructuredChange({
+        ...structured,
+        valor: formatted,
+        valor_extenso: valorPorExtenso(formatted)
+      });
+    }
   };
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  // CNPJ status
+  const getCnpjStatus = (): 'success' | 'warning' | 'error' | null => {
+    if (!structured?.cnpj) return null;
+    return validarCNPJ(structured.cnpj) ? 'success' : 'error';
   };
 
   return (
@@ -118,15 +176,40 @@ export const Editor: React.FC<EditorProps> = ({
       <div className="flex-1 min-h-0 relative">
         {viewMode === 'form' ? (
           <div className={`w-full h-full grid grid-cols-1 md:grid-cols-2 gap-4 ${compactView ? '' : 'p-6 border border-border-base rounded-lg bg-white shadow-inner overflow-auto'}`}>
-            <InputField label="Nº do Processo" value={structured?.num_processo || ''} onChange={(val) => updateField('num_processo', val)} fullWidth />
-            <InputField label="Nº da Nota Fiscal" value={structured?.num_nota_fiscal || ''} onChange={(val) => updateField('num_nota_fiscal', val)} />
-            <InputField label="Secretaria" value={structured?.secretaria || ''} onChange={(val) => updateField('secretaria', val)} />
-            <InputField label="Contrato n.º" value={structured?.num_contrato || ''} onChange={(val) => updateField('num_contrato', val)} />
-            <InputField label="Pregão Eletrônico" value={structured?.num_pregao || ''} onChange={(val) => updateField('num_pregao', val)} />
-            <InputField label="Valor (R$)" value={structured?.valor || ''} onChange={(val) => updateField('valor', val)} />
-            <InputField label="Credor" value={structured?.credor || ''} onChange={(val) => updateField('credor', val)} />
-            <InputField label="CNPJ" value={structured?.cnpj || ''} onChange={(val) => updateField('cnpj', val)} />
+            
+            {/* Group 1: Nº do Contrato, Nº do Processo e Pregão Eletrônico */}
+            <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <InputField label="Contrato" value={structured?.num_contrato || ''} onChange={(val) => updateField('num_contrato', val)} />
+              <InputField label="Processo" value={structured?.num_processo || ''} onChange={(val) => updateField('num_processo', val)} />
+              <InputField label="Pregão Eletrônico" value={structured?.num_pregao || ''} onChange={(val) => updateField('num_pregao', val)} />
+            </div>
+            
+            <InputField label="Secretaria" value={structured?.secretaria || ''} onChange={(val) => updateField('secretaria', val)} fullWidth />
+            
+            {/* Group 2: Valor e NF */}
+            <InputField 
+              label="Valor (R$)" 
+              value={structured?.valor || ''} 
+              onChange={(val) => updateField('valor', val)} 
+              onBlur={forceFormatValor}
+              helperText={structured?.valor_extenso ? `Extenso: ${structured.valor_extenso}` : undefined}
+            />
+            <InputField label="Nota Fiscal" value={structured?.num_nota_fiscal || ''} onChange={(val) => updateField('num_nota_fiscal', val)} />
+            
+            {/* Group 3: Credor e CNPJ */}
+            <InputField label="Empresa" value={structured?.credor || ''} onChange={(val) => updateField('credor', val)} />
+            <InputField 
+              label="CNPJ" 
+              value={structured?.cnpj || ''} 
+              onChange={(val) => updateField('cnpj', val)} 
+              status={getCnpjStatus()}
+              helperText={structured?.cnpj && !validarCNPJ(structured.cnpj) ? 'Dígito verificador inválido ou incompleto' : undefined}
+            />
+            
+            {/* Group 4: Objeto */}
             <InputField label="Objeto do Contrato" value={structured?.objeto || ''} onChange={(val) => updateField('objeto', val)} fullWidth isTextArea />
+            
+            {/* Group 5: Empenho e Liquidação */}
             <InputField label="Nota de Empenho" value={structured?.num_empenho || ''} onChange={(val) => updateField('num_empenho', val)} />
             <InputField label="Nota de Liquidação" value={structured?.num_liquidacao || ''} onChange={(val) => updateField('num_liquidacao', val)} />
             
@@ -135,6 +218,51 @@ export const Editor: React.FC<EditorProps> = ({
               <InputField label="Mês" value={structured?.mes || ''} onChange={(val) => updateField('mes', val)} />
               <InputField label="Ano" value={structured?.ano || ''} onChange={(val) => updateField('ano', val)} />
             </div>
+
+            {/* Compliance Audit Feedback Panel for Municipal Auditing */}
+            <div className="col-span-2 mt-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-3">
+              <h4 className="text-[11px] font-extrabold text-slate-800 uppercase tracking-widest flex items-center gap-1.5 border-b border-dashed border-slate-200 pb-2">
+                🔎 Verificação Prévia de Auditoria do Controle Interno
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-[10.5px] text-slate-600">
+                <div className="flex items-center gap-2">
+                  {structured?.num_processo ? (
+                    <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[9px]">✓</span>
+                  ) : (
+                    <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-[9px]">!</span>
+                  )}
+                  <span>Processo Administrativo: <strong className="text-slate-700">{structured?.num_processo || 'Nenhum'}</strong></span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {structured?.cnpj && validarCNPJ(structured.cnpj) ? (
+                    <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[9px]">✓</span>
+                  ) : (
+                    <span className="w-4 h-4 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-[9px]">✗</span>
+                  )}
+                  <span>Situação do CNPJ: <strong className="text-slate-700">{structured?.cnpj ? (validarCNPJ(structured.cnpj) ? 'Análise Consistente' : 'Erro de Dígitos') : 'Não Escaneado'}</strong></span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {structured?.valor && structured?.valor_extenso ? (
+                    <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[9px]">✓</span>
+                  ) : (
+                    <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-[9px]">!</span>
+                  )}
+                  <span>Valor por Extenso: <strong className="text-slate-700">{structured?.valor_extenso ? 'Sincronizado' : 'Aguardando Valor'}</strong></span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {structured?.num_nota_fiscal ? (
+                    <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[9px]">✓</span>
+                  ) : (
+                    <span className="w-4 h-4 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-[9px]">✗</span>
+                  )}
+                  <span>Comprovação Fiscal: <strong className="text-slate-700">{structured?.num_nota_fiscal ? `NF n.º ${structured.num_nota_fiscal}` : 'Impossibilita Liquidação'}</strong></span>
+                </div>
+              </div>
+            </div>
+
           </div>
         ) : viewMode === 'text' ? (
           <textarea
