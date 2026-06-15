@@ -374,7 +374,7 @@ async function createTemplate() {
             alignment: AlignmentType.CENTER,
             spacing: { line: 360 },
             children: [
-              new TextRun({ text: "CONTROLADOR VALOR GERAL INTERINO DO MUNICÍPIO", bold: true, font: "Times New Roman" }),
+              new TextRun({ text: "CONTROLADOR GERAL INTERINO DO MUNICÍPIO", bold: true, font: "Times New Roman" }),
             ],
           }),
           new Paragraph({
