@@ -3,7 +3,7 @@ import { FileUpload } from './components/FileUpload';
 import { ScannerFolderConfig } from './components/ScannerFolderConfig';
 import { Editor } from './components/Editor';
 import { apiService } from './services/api';
-import { AlertCircle, Layout, Printer, Info, Sparkles, Check } from 'lucide-react';
+import { AlertCircle, Layout, Printer, Info, Sparkles, Check, Settings, Key, X, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { valorPorExtenso } from './utils/currency';
@@ -250,6 +250,10 @@ const ReportDocument = ({ structuredData }: { structuredData: any }) => (
 export default function App() {
   const [currentStep, setCurrentStep] = useState<AppStep>(AppStep.CHOICE);
   const [selectedMode, setSelectedMode] = useState<'image' | 'form' | null>(null);
+  const [customApiKey, setCustomApiKey] = useState<string>(() => {
+    return localStorage.getItem('gemini_api_key_custom') || '';
+  });
+  const [showApiModal, setShowApiModal] = useState(false);
   const [extractedText, setExtractedText] = useState<string>('');
   const [structuredData, setStructuredData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -464,9 +468,9 @@ export default function App() {
       setLoadingMessage('Refinando dados com IA...');
       
       try {
-        // Fallback to the user's provided key if environment variable is not set
-        const apiKey = process.env.GEMINI_API_KEY || 'AIzaSyDzua6GSrfPoDNxKiEAFub2I2M5Ae3nyFU';
-        const ai = new GoogleGenAI({ apiKey });
+        // Priority: 1. User custom typed key, 2. Compiled process.env.GEMINI_API_KEY, 3. Blocked public fallback
+        const apiKeyToUse = customApiKey?.trim() || process.env.GEMINI_API_KEY || 'AIzaSyDzua6GSrfPoDNxKiEAFub2I2M5Ae3nyFU';
+        const ai = new GoogleGenAI({ apiKey: apiKeyToUse });
         
         const prompt = `Você é um assistente especializado em Controle Interno da Prefeitura de Barra do Corda - MA.
         Sua tarefa é extrair e corrigir ortograficamente os campos abaixo do texto OCR de um documento (Nota de Empenho, Nota de Liquidação, NF, etc).
@@ -695,6 +699,20 @@ export default function App() {
           </div>
           
           <div className="w-1/3 flex justify-end items-center gap-5">
+            <button
+              onClick={() => setShowApiModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:border-slate-300 transition-all cursor-pointer shadow-sm pointer-events-auto"
+              title="Configurar Chave API do Gemini"
+            >
+              <Key className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden md:inline">Chave API</span>
+              {customApiKey ? (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              )}
+            </button>
+
             {currentStep !== AppStep.CHOICE && (
               <>
                 <div className="flex gap-1">
@@ -1081,6 +1099,115 @@ export default function App() {
       <div className="print-only">
         {structuredData && <ReportDocument structuredData={structuredData} />}
       </div>
+
+      {/* API Key Modal */}
+      <AnimatePresence>
+        {showApiModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowApiModal(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            
+            {/* Modal Body */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-10"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-2 font-sans">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                    <Key className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-sm">Configurar Chave API</h3>
+                    <p className="text-[10px] text-slate-400 italic">Serviços de IA (Gemini)</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowApiModal(false)}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-4 font-sans">
+                <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 flex gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="text-[11px] text-amber-900 leading-relaxed space-y-1">
+                    <p className="font-bold">Por que configurar uma chave pessoal?</p>
+                    <p>
+                      O servidor inteligente funciona 100% no ambiente local ou Cloud Run. Ao publicar no <b>Vercel</b> (hospedagem estática de frontend), as buscas e o refino de IA executam diretamente no navegador.
+                    </p>
+                    <p className="font-semibold text-[10px] text-amber-800 mt-1">
+                      A chave pública padrão foi desativada pelo Google por limites e avisos de segurança regulamentares. Para usar as funções automáticas de OCR com IA e a correção gramatical inteligente no Vercel, insira sua própria chave Gemini.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider block">
+                    Sua Chave API do Gemini (Google AI Studio)
+                  </label>
+                  <input
+                    type="password"
+                    value={customApiKey}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomApiKey(val);
+                      localStorage.setItem('gemini_api_key_custom', val);
+                    }}
+                    placeholder="Cole sua chave AIzaSy..."
+                    className="w-full h-11 px-4 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50/30 focus:bg-white transition-all font-mono placeholder:font-sans"
+                  />
+                  <div className="flex justify-between items-center text-[10px] text-slate-450 pt-1">
+                    <span>Salva localmente no seu navegador.</span>
+                    <a
+                      href="https://aistudio.google.com/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline font-semibold"
+                    >
+                      Obter Chave Grátis ↗
+                    </a>
+                  </div>
+                </div>
+
+                {customApiKey && (
+                  <div className="bg-emerald-50/50 border border-emerald-200/50 rounded-xl p-3 flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="text-[10px] text-emerald-850 font-semibold">
+                      Chave personalizada configurada ativa!
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowApiModal(false)}
+                  className="px-4 py-2 bg-[#2563eb] text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
+                >
+                  Confirmar e Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
