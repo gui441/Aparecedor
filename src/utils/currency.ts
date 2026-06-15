@@ -123,13 +123,13 @@ function escreverPorExtenso(valor: number): string {
  */
 export function formatarReal(valorStr: string): string {
   if (!valorStr) return '';
-  let v = valorStr.replace(/\D/g, '');
+  let v = valorStr.replace(/R\$\s*/gi, '').replace(/\D/g, '');
   if (v === '') return '';
   
   v = (parseFloat(v) / 100).toFixed(2).toString();
   v = v.replace('.', ',');
   v = v.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
-  return `R$ ${v}`;
+  return v;
 }
 
 /**

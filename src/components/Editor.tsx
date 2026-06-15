@@ -107,6 +107,30 @@ export const Editor: React.FC<EditorProps> = ({
     }
   };
 
+  const forceFormatCredor = () => {
+    if (structured?.credor) {
+      const formatted = structured.credor
+        .toUpperCase()
+        .trim();
+      onStructuredChange({
+        ...structured,
+        credor: formatted
+      });
+    }
+  };
+
+  const forceFormatObjeto = () => {
+    if (structured?.objeto) {
+      const formatted = structured.objeto
+        .toLowerCase()
+        .trim();
+      onStructuredChange({
+        ...structured,
+        objeto: formatted
+      });
+    }
+  };
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(content);
     setCopied(true);
@@ -177,11 +201,60 @@ export const Editor: React.FC<EditorProps> = ({
         {viewMode === 'form' ? (
           <div className={`w-full h-full grid grid-cols-1 md:grid-cols-2 gap-4 ${compactView ? '' : 'p-6 border border-border-base rounded-lg bg-white shadow-inner overflow-auto'}`}>
             
-            {/* Group 1: Nº do Contrato, Nº do Processo e Pregão Eletrônico */}
-            <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Group 1: Nº do Contrato, Nº do Processo, Pregão Eletrônico e Termo Aditivo */}
+            <div className="col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4">
               <InputField label="Contrato" value={structured?.num_contrato || ''} onChange={(val) => updateField('num_contrato', val)} />
               <InputField label="Processo" value={structured?.num_processo || ''} onChange={(val) => updateField('num_processo', val)} />
               <InputField label="Pregão Eletrônico" value={structured?.num_pregao || ''} onChange={(val) => updateField('num_pregao', val)} />
+              <InputField label="Termo Aditivo" value={structured?.num_aditivo || ''} onChange={(val) => updateField('num_aditivo', val)} />
+            </div>
+
+            {/* Legislation Selector Toggles */}
+            <div className="col-span-2 bg-[#f8fafc] border border-[#e2e8f0] p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <label className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider block mb-0.5">
+                  Lei de Regência (Parecer de Licitações)
+                </label>
+                <p className="text-[10px] text-slate-500 italic">
+                  Defina a lei de licitações aplicável a este parecer de despesa.
+                </p>
+              </div>
+              <div className="flex bg-slate-100 p-1 rounded-xl gap-1 select-none shrink-0 border border-[#e2e8f0]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStructuredChange({
+                      ...structured,
+                      lei_regencia: '14.133/21',
+                      is_lei_8666: false
+                    });
+                  }}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+                    (structured?.lei_regencia || '14.133/21') === '14.133/21'
+                      ? 'bg-white shadow text-[#2563eb] border border-slate-200/50'
+                      : 'text-slate-500 hover:text-[#0f172a]'
+                  }`}
+                >
+                  Lei n.º 14.133/21
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStructuredChange({
+                      ...structured,
+                      lei_regencia: '8.666/93',
+                      is_lei_8666: true
+                    });
+                  }}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+                    structured?.lei_regencia === '8.666/93'
+                      ? 'bg-white shadow text-[#2563eb] border border-slate-200/50'
+                      : 'text-slate-500 hover:text-[#0f172a]'
+                  }`}
+                >
+                  Lei n.º 8.666/93
+                </button>
+              </div>
             </div>
             
             <InputField label="Secretaria" value={structured?.secretaria || ''} onChange={(val) => updateField('secretaria', val)} fullWidth />
@@ -197,7 +270,12 @@ export const Editor: React.FC<EditorProps> = ({
             <InputField label="Nota Fiscal" value={structured?.num_nota_fiscal || ''} onChange={(val) => updateField('num_nota_fiscal', val)} />
             
             {/* Group 3: Credor e CNPJ */}
-            <InputField label="Empresa" value={structured?.credor || ''} onChange={(val) => updateField('credor', val)} />
+            <InputField 
+              label="Empresa" 
+              value={structured?.credor || ''} 
+              onChange={(val) => updateField('credor', val)} 
+              onBlur={forceFormatCredor}
+            />
             <InputField 
               label="CNPJ" 
               value={structured?.cnpj || ''} 
@@ -207,7 +285,14 @@ export const Editor: React.FC<EditorProps> = ({
             />
             
             {/* Group 4: Objeto */}
-            <InputField label="Objeto do Contrato" value={structured?.objeto || ''} onChange={(val) => updateField('objeto', val)} fullWidth isTextArea />
+            <InputField 
+              label="Objeto do Contrato" 
+              value={structured?.objeto || ''} 
+              onChange={(val) => updateField('objeto', val)} 
+              onBlur={forceFormatObjeto} 
+              fullWidth 
+              isTextArea 
+            />
             
             {/* Group 5: Empenho e Liquidação */}
             <InputField label="Nota de Empenho" value={structured?.num_empenho || ''} onChange={(val) => updateField('num_empenho', val)} />

@@ -189,6 +189,25 @@ async function createTemplate() {
           new Paragraph({
             style: "ParecerHeader",
             children: [
+              new TextRun({ text: "{#num_aditivo}", bold: true }),
+            ],
+          }),
+          new Paragraph({
+            style: "ParecerHeader",
+            children: [
+              new TextRun({ text: "Termo Aditivo n.º ", bold: true }),
+              new TextRun({ text: "{num_aditivo}", bold: true }),
+            ],
+          }),
+          new Paragraph({
+            style: "ParecerHeader",
+            children: [
+              new TextRun({ text: "{/num_aditivo}", bold: true }),
+            ],
+          }),
+          new Paragraph({
+            style: "ParecerHeader",
+            children: [
               new TextRun({ text: "Valor: ", bold: true }),
               new TextRun({ text: "R$ ", bold: true }),
               new TextRun({ text: "{valor}", bold: true }),
@@ -223,9 +242,9 @@ async function createTemplate() {
               new TextRun({ text: "{num_nota_fiscal}", bold: true }),
               new TextRun(", que tem como credor a empresa "),
               new TextRun({ text: "{credor}", bold: true }),
-              new TextRun(", portadora do CNPJ "),
+              new TextRun({ text: ", portadora do CNPJ ", bold: true }),
               new TextRun({ text: "{cnpj}", bold: true }),
-              new TextRun(", contrato que tem como objeto "),
+              new TextRun(", contrato que tem como objeto contratação de empresa para "),
               new TextRun("{objeto}"),
               new TextRun(", para satisfazer as necessidades da Secretaria de "),
               new TextRun("{secretaria}"),
@@ -281,7 +300,26 @@ async function createTemplate() {
           new Paragraph({
             style: "ParecerPara",
             children: [
-              new TextRun("Tendo em vista o exposto, levando em consideração a análise da fase de pagamento e considerando os dados extraídos dos autos em apreço, constata-se que os termos apresentados, cumprem parcialmente as exigências contidas legislação vigente, sobretudo a Lei n.º 4.320/64 e Lei n.º 14.133/21."),
+              new TextRun("Tendo em vista o exposto, levando em consideração a análise da fase de pagamento e considerando os dados extraídos dos autos em apreço, constata-se que os termos apresentados, cumprem parcialmente as exigências contidas legislação vigente, sobretudo a Lei n.º 4.320/64 e Lei n.º {lei_regencia}."),
+            ],
+          }),
+
+          new Paragraph({
+            style: "ParecerPara",
+            children: [
+              new TextRun("{#is_lei_8666}"),
+            ],
+          }),
+          new Paragraph({
+            style: "ParecerPara",
+            children: [
+              new TextRun("É importante ressaltarmos que o contrato deste processo é regido pela Lei n.º 8.666/93, tendo em vista que o contrato do presente foi assinado anterior a vigência da Lei n.º 14.133/21, estando assim em conformidade com o artigo 190 da presente lei vigente."),
+            ],
+          }),
+          new Paragraph({
+            style: "ParecerPara",
+            children: [
+              new TextRun("{/is_lei_8666}"),
             ],
           }),
           new Paragraph({

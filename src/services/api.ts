@@ -12,10 +12,11 @@ export interface ExtractionResult {
 
 export const apiService = {
   async extractText(file: File, onProgress?: (message: string) => void): Promise<ExtractionResult> {
-    // 1. Try to use the high-precision server-side Gemini OCR first if online
+    // Para testar PURAMENTE com Tesseract.js (leitura/OCR com IA desativada temporariamente)
+    const enableServerIA = true;
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
-    if (isOnline) {
+    if (enableServerIA && isOnline) {
       try {
         console.log('Iniciando OCR de alta fidelidade pelo servidor para o arquivo:', file.name);
         if (onProgress) onProgress('Processando imagem com IA de alta fidelidade...');
@@ -43,93 +44,13 @@ export const apiService = {
         console.warn('Erro na requisição de OCR ao servidor, iniciando fallback local:', serverErr);
       }
     } else {
-      console.log('Dispositivo em modo offline. Ignorando chamadas ao servidor e iniciando OCR local imediatamente.');
-      if (onProgress) onProgress('Modo offline detectado. Iniciando OCR local rápido...');
+      console.log('Utilizando OCR local imediato com Tesseract.js (IA desativada).');
     }
 
-    // 2. Client-side fallback compilation with Tesseract (offline or non-configured cases)
+    // 2. Client-side compilation with clean, pristine Tesseract directly on the original high-quality file
     try {
-      console.log('Iniciando OCR local (Tesseract) de alta precisão com pré-processamento avançado...');
-      if (onProgress) onProgress('Preparando imagem localmente (Otimizando contraste)...');
-
-      // Create a canvas to preprocess the image
-      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = (e) => reject(new Error('Erro ao carregar imagem: ' + e));
-        img.src = URL.createObjectURL(file);
-      });
-
-      console.log('Imagem carregada no cliente:', image.width, 'x', image.height);
-
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas context could not be created');
-
-      // Downscale if image is too large (max 1600px width/height)
-      const MAX_DIM = 1600;
-      let width = image.width;
-      let height = image.height;
-      
-      if (width > MAX_DIM || height > MAX_DIM) {
-        if (width > height) {
-          height *= MAX_DIM / width;
-          width = MAX_DIM;
-        } else {
-          width *= MAX_DIM / height;
-          height = MAX_DIM;
-        }
-        console.log('Redimensionando localmente para:', Math.round(width), 'x', Math.round(height));
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-
-      // Draw original image scaled
-      ctx.drawImage(image, 0, 0, width, height);
-
-      // Preprocessing: High-contrast binarization and adaptive-like thresholding
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-      
-      // Compute average luminance to define base threshold
-      let totalLuminance = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        // Human eye standard luminosity weights: Green is highest, blue is lowest
-        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        data[i] = data[i + 1] = data[i + 2] = gray;
-        totalLuminance += gray;
-      }
-      
-      const avgLuminance = totalLuminance / (data.length / 4);
-
-      // Binarize/Enhance Contrast: Map values to pure white (background) or pure black (text)
-      // This eliminates yellow paper scanning tints, shadows and noise dynamically
-      for (let i = 0; i < data.length; i += 4) {
-        const v = data[i];
-        let newVal = 128;
-        if (v < avgLuminance * 0.95) {
-          newVal = 0;      // Pure black for letters
-        } else if (v > avgLuminance * 1.05) {
-          newVal = 255;    // Pure white for backgrounds
-        } else {
-          // Sharp threshold contrast scaling for high letter edge definition
-          newVal = ((v - avgLuminance * 0.95) / (avgLuminance * 0.1)) * 255;
-        }
-        data[i] = data[i + 1] = data[i + 2] = newVal;
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      // Convert canvas to blob for Tesseract
-      const processedBlob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Failed to create blob from canvas'));
-        }, 'image/jpeg', 0.9);
-      });
-
-      URL.revokeObjectURL(image.src);
-      console.log('Pre-processamento avançado da imagem concluído');
+      console.log('Iniciando OCR local com Tesseract.js diretamente no arquivo original...');
+      if (onProgress) onProgress('Preparando motor de OCR local...');
 
       const worker = await createWorker('por', 1, {
         logger: m => {
@@ -144,8 +65,21 @@ export const apiService = {
         }
       });
       
-      console.log('Worker local pronto');
-      const { data: { text: rawText } } = await worker.recognize(processedBlob);
+      console.log('Worker local pronto. Configurando parâmetros...');
+      
+      // Set parameters for high precision document analysis:
+      // - Page Segmentation Mode (PSM) 3 is automatic page layout parsing
+      // - Declare a higher DPI (300) to optimize internal word segmentation and prevent console logs/warnings
+      // - Blacklist common garbage character noise to optimize the output
+      await worker.setParameters({
+        tessedit_pageseg_mode: '3' as any,
+        user_defined_dpi: '300',
+        tessedit_char_blacklist: '`#%^*~|{}[]<>\\', // Blacklist annoying OCR artifact symbols
+        tessedit_enable_dict_correction: '1' as any,
+      });
+
+      if (onProgress) onProgress('Extraindo texto do documento digitalizado...');
+      const { data: { text: rawText } } = await worker.recognize(file);
       console.log('Reconhecimento local concluído, tamanho do texto:', rawText?.length);
       
       await worker.terminate();

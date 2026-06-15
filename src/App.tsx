@@ -102,12 +102,46 @@ export function cleanObjeto(obj: string): string {
                    .replace(/\s*-\s*$/g, '')
                    .trim();
 
-  // If first letter is lowercase and length > 1, capitalize it for professional appearance
-  if (cleaned.length > 1 && cleaned[0] === cleaned[0].toLowerCase() && !cleaned.startsWith('ar-')) {
-    cleaned = cleaned[0].toUpperCase() + cleaned.substring(1);
+  return cleaned.toLowerCase();
+}
+
+export function cleanCredor(credor: string): string {
+  if (!credor) return '';
+  return credor
+    .toUpperCase()
+    .trim();
+}
+
+export function cleanSecretariaForFilename(name: string): string {
+  if (!name) return '';
+  
+  const normalized = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .trim();
+  
+  if (
+    normalized === "PLANEJAMENTO, ORCAMENTO E GESTAO" || 
+    normalized === "PLANEJAMENTO ORCAMENTO E GESTAO" || 
+    normalized.includes("PLANEJAMENTO, ORCAMENTO") || 
+    normalized.includes("PLANEJAMENTO ORCAMENTO") ||
+    normalized === "SEPLAN"
+  ) {
+    return "SEPLAN";
   }
 
-  return cleaned;
+  if (
+    normalized.includes("ASSISTENCIA SOCIAL") ||
+    normalized === "ASSISTENCIA"
+  ) {
+    return "ASSISTÊNCIA";
+  }
+
+  return name
+    .replace(/^(?:secretaria\s+municipal\s+de\s+|secretaria\s+municipal\s+da\s+|secretaria\s+adjunta\s+de\s+|secretaria\s+de\s+|secretaria\s+da\s+|secretaria\s+|sec\.\s+de\s+|sec\.\s+|sec\s+de\s+|sec\s+)/gi, '')
+    .trim()
+    .toUpperCase();
 }
 
 const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
@@ -117,16 +151,17 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
     <div className="header-field">Assunto: Análise do Processo Administrativo n.º {structuredData.num_processo}</div>
     <div className="header-field">Objeto: Pagamento da Nota Fiscal n.º {structuredData.num_nota_fiscal}, da Secretaria Municipal de {structuredData.secretaria} desta Municipalidade.</div>
     <div className="header-field">Contrato n.º {structuredData.num_contrato} – Pregão Eletrônico n.º {structuredData.num_pregao}</div>
+    {structuredData.num_aditivo ? <div className="header-field">Termo Aditivo n.º {structuredData.num_aditivo}</div> : null}
     <div className="header-field mb-3">Valor: {structuredData.valor?.toString().startsWith('R$') ? structuredData.valor : `R$ ${structuredData.valor}`}{structuredData.valor_extenso ? ` (${structuredData.valor_extenso})` : ''}</div>
 
     <p>
-      O Órgão de Controle Interno da Prefeitura Municipal de Barra do Corda – MA, atendendo o previsto nos Artigos 31 e 74 da Constituição Federal, Artigo 59 da Lei Complementar n.º 101, de 04 de maio de 2000, e demais normas que regulam as atribuições do Sistema de Controle Interno, referentes ao exercício de controle prévio e concomitante dos atos de gestão para análise quanto à legalidade e verificação das demais formalidades, no que tange ao Processo Administrativo, encaminhado pela Secretaria Municipal de {structuredData.secretaria}, referente à solicitação de pagamento das despesas constantes da Nota Fiscal n.º <b>{structuredData.num_nota_fiscal}</b>, em favor da empresa nacional <b>{structuredData.credor}</b>, portadora do CNPJ <b>{structuredData.cnpj}</b>.
+      O Órgão de Controle Interno da Prefeitura Municipal de Barra do Corda – MA, atendendo o previsto nos Artigos 31 e 74 da Constituição Federal, Artigo 59 da Lei Complementar n.º 101, de 04 de maio de 2000, e demais normas que regulam as atribuições do Sistema de Controle Interno, referentes ao exercício de controle prévio e concomitante dos atos de gestão para análise quanto à legalidade e verificação das demais formalidades, no que tange ao Processo Administrativo, encaminhado pela Secretaria Municipal de {structuredData.secretaria}, referente à solicitação de pagamento das despesas constantes da Nota Fiscal n.º <b>{structuredData.num_nota_fiscal}</b>, em favor da empresa nacional <b>{structuredData.credor}</b>, <b>portadora do CNPJ</b> <b>{structuredData.cnpj}</b>.
     </p>
 
     <div className="section-title">I - RELATÓRIO</div>
     
     <p>
-      Veio ao conhecimento desta Controladoria Geral do Município de Barra Do Corda/MA, o Processo de Pagamento referente a Nota Fiscal de n.º <b>{structuredData.num_nota_fiscal}</b>, que tem como credor a empresa <b>{structuredData.credor}</b>, portadora do CNPJ <b>{structuredData.cnpj}</b>, contrato que tem como objeto {structuredData.objeto}, para satisfazer as necessidades da Secretaria de {structuredData.secretaria} do município de Barra do Corda - MA, para análise quanto a legalidade e verificação das demais formalidades, a fim de executar o respectivo pagamento.
+      Veio ao conhecimento desta Controladoria Geral do Município de Barra Do Corda/MA, o Processo de Pagamento referente a Nota Fiscal de n.º <b>{structuredData.num_nota_fiscal}</b>, que tem como credor a empresa <b>{structuredData.credor}</b>, <b>portadora do CNPJ</b> <b>{structuredData.cnpj}</b>, contrato que tem como objeto contratação de empresa para {structuredData.objeto}, para satisfazer as necessidades da Secretaria de {structuredData.secretaria} do município de Barra do Corda - MA, para análise quanto a legalidade e verificação das demais formalidades, a fim de executar o respectivo pagamento.
     </p>
 
     <div className="section-title">II - DA ANÁLISE DOS DOCUMENTOS ANEXADOS</div>
@@ -165,8 +200,14 @@ const ReportPage2 = ({ structuredData }: { structuredData: any }) => (
     <div className="section-title">III - CONCLUSÃO</div>
     
     <p>
-      Tendo em vista o exposto, levando em consideração a análise da fase de pagamento e considerando os dados extraídos dos autos em apreço, constata-se que os termos apresentados, cumprem parcialmente as exigências contidas legislação vigente, sobretudo a Lei n.º 4.320/64 e Lei n.º 14.133/21.
+      Tendo em vista o exposto, levando em consideração a análise da fase de pagamento e considerando os dados extraídos dos autos em apreço, constata-se que os termos apresentados, cumprem parcialmente as exigências contidas legislação vigente, sobretudo a Lei n.º 4.320/64 e Lei n.º {structuredData.lei_regencia || '14.133/21'}.
     </p>
+    
+    {(structuredData.is_lei_8666 || structuredData.lei_regencia === '8.666/93') && (
+      <p>
+        É importante ressaltarmos que o contrato deste processo é regido pela Lei n.º 8.666/93, tendo em vista que o contrato do presente foi assinado anterior a vigência da Lei n.º 14.133/21, estando assim em conformidade com o artigo 190 da presente lei vigente.
+      </p>
+    )}
     
     <p>
       Nesse sentido, esta Controladoria emite parecer pela APROVAÇÃO CONDICIONADA do pagamento em apreço, baseada na comprovação da regularidade fiscal e ateste do fiscal de contrato.
@@ -256,6 +297,7 @@ export default function App() {
       secretaria: '',
       num_contrato: '',
       num_pregao: '',
+      num_aditivo: '',
       valor: '',
       valor_extenso: '',
       credor: '',
@@ -263,6 +305,8 @@ export default function App() {
       objeto: '',
       num_empenho: '',
       num_liquidacao: '',
+      lei_regencia: '14.133/21',
+      is_lei_8666: false,
       dia: now.getDate().toString(),
       mes: now.toLocaleString('pt-BR', { month: 'long' }),
       ano: now.getFullYear().toString()
@@ -284,12 +328,18 @@ export default function App() {
       const now = new Date();
 
       if (serverStructured) {
+        if (serverStructured.valor) {
+          serverStructured.valor = serverStructured.valor.replace(/R\$\s*/gi, '').trim();
+        }
         // We received perfect structured values directly from the server-side multimodal Gemini OCR!
         // No client-side regex or second refinement LLM call is required.
         setStructuredData({
           ...serverStructured,
+          credor: cleanCredor(serverStructured.credor || ''),
           valor_extenso: valorPorExtenso(serverStructured.valor || ''),
           secretaria: cleanSecretaria(serverStructured.secretaria),
+          lei_regencia: '14.133/21',
+          is_lei_8666: false,
           dia: now.getDate().toString(),
           mes: now.toLocaleString('pt-BR', { month: 'long' }),
           ano: now.getFullYear().toString()
@@ -359,6 +409,9 @@ export default function App() {
         
         // Pregão no histórico: "Pregão Eletrônico n° 53/2025" ou "PE nº 53/2025"
         num_pregao: text.match(/(?:PE|Pregão|Pregao)(?:\s+Eletr[ôo]nico)?\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
+
+        // Termo Aditivo no histórico: "Termo Aditivo nº 01/2025" ou similar
+        num_aditivo: text.match(/(?:Termo\s+Aditivo|Aditivo|TA)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
         
         // Complex fields handled by keywords
         credor: findAfter(['Credor', 'RAZÃO SOCIAL', 'NOME DO CREDOR', 'CONTRATADA', 'EMPRESA'], 60),
@@ -369,9 +422,9 @@ export default function App() {
         secretaria: findAfter(['UNIDADE ORÇAMENTÁRIA', 'SECRETARIA', 'ÓRGÃO', 'UNIDADE'], 60)
       };
 
-      // Limpeza de campos comuns
-      if (regexData.valor && !regexData.valor.startsWith('R$')) {
-        regexData.valor = `R$ ${regexData.valor}`;
+      // Limpeza de campos comuns: remove prefixo "R$" caso o regex tenha capturado
+      if (regexData.valor) {
+        regexData.valor = regexData.valor.replace(/R\$\s*/gi, '').trim();
       }
 
       // Especialização para Barra do Corda (Keywords comuns)
@@ -384,9 +437,12 @@ export default function App() {
       // Date pre-fill and clean
       const initialData = {
         ...regexData,
+        credor: cleanCredor(regexData.credor || ''),
         valor_extenso: valorPorExtenso(regexData.valor || ''),
         secretaria: cleanSecretaria(regexData.secretaria),
         objeto: cleanObjeto(regexData.objeto),
+        lei_regencia: '14.133/21',
+        is_lei_8666: false,
         dia: now.getDate().toString(),
         mes: now.toLocaleString('pt-BR', { month: 'long' }),
         ano: now.getFullYear().toString()
@@ -395,9 +451,11 @@ export default function App() {
       setStructuredData(initialData);
 
       // Step 3: AI Structuring (The "Regardless of means" solution if online)
+      // Para testar PURAMENTE com Tesseract.js (leitura/refinamento com IA desativada temporariamente)
+      const enableAIStructuring = true;
       const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
-      if (!isOnline) {
-        console.log('Modo desplugado (offline): pulando refinamento estrutural com IA para evitar latência de rede/timeouts.');
+      if (!isOnline || !enableAIStructuring) {
+        console.log('IA desativada para testes ou offline: pulando refinamento estrutural com IA.');
         setCurrentStep(AppStep.SETUP);
         setIsLoading(false);
         return;
@@ -426,6 +484,7 @@ export default function App() {
         - secretaria: O nome específico da secretaria (ex: "Saúde", "Educação", "Planejamento, Orçamento e Gestão", "Assistência Social"). Sem prefixos "Secretaria Municipal de".
         - num_contrato: Número do contrato no histórico.
         - num_pregao: Número do Pregão (PE) no histórico.
+        - num_aditivo: Número do Termo Aditivo, caso esteja mencionado no documento.
         - valor: Valor total/liquidado (Ex: R$ 34.923,00).
         - credor: Razão Social ou Nome do Credor.
         - cnpj: CNPJ do Credor.
@@ -449,6 +508,7 @@ export default function App() {
                 secretaria: { type: Type.STRING },
                 num_contrato: { type: Type.STRING },
                 num_pregao: { type: Type.STRING },
+                num_aditivo: { type: Type.STRING },
                 valor: { type: Type.STRING },
                 credor: { type: Type.STRING },
                 cnpj: { type: Type.STRING },
@@ -461,6 +521,9 @@ export default function App() {
         });
 
         const aiStructured = JSON.parse(aiResult.text || '{}');
+        if (aiStructured.valor) {
+          aiStructured.valor = aiStructured.valor.replace(/R\$\s*/gi, '').trim();
+        }
         
         // Update with AI data, keeping date context
         setStructuredData((prev: any) => {
@@ -468,6 +531,7 @@ export default function App() {
           return {
             ...prev,
             ...aiStructured,
+            credor: cleanCredor(aiStructured.credor || prev.credor || ''),
             valor_extenso: valorPorExtenso(rawVal),
             secretaria: cleanSecretaria(aiStructured.secretaria || prev.secretaria || ''),
             objeto: cleanObjeto(aiStructured.objeto || prev.objeto || ''),
@@ -500,12 +564,14 @@ export default function App() {
       const a = document.createElement('a');
       a.href = url;
       
-      // Nova lógica de nome: Credor - Nota Fiscal - Valor
+      // Nova lógica de nome: Credor - Secretaria - Nota Fiscal - Valor
       const credorText = (structuredData.credor || 'Final').trim();
+      const secretariaText = cleanSecretariaForFilename(structuredData.secretaria || '');
       const nfText = (structuredData.num_nota_fiscal || '000').trim();
       const valorText = (structuredData.valor || '0,00').trim();
       
-      const fileName = `PARECER ${credorText} - R$ ${valorText} - NF ${nfText}.docx`
+      const secPart = secretariaText ? ` - ${secretariaText}` : '';
+      const fileName = `PARECER ${credorText}${secPart} - R$ ${valorText} - NF ${nfText}.docx`
         .replace(/[/\\?%*:|"<>]/g, '-'); // Sanitização básica
         
       a.download = fileName;
@@ -552,10 +618,12 @@ export default function App() {
       });
       
       const credorText = (structuredData.credor || 'Final').trim();
+      const secretariaText = cleanSecretariaForFilename(structuredData.secretaria || '');
       const nfText = (structuredData.num_nota_fiscal || '000').trim();
       const valorText = (structuredData.valor || '0,00').trim();
       
-      const fileName = `PARECER ${credorText} - R$ ${valorText} - NF ${nfText}.pdf`
+      const secPart = secretariaText ? ` - ${secretariaText}` : '';
+      const fileName = `PARECER ${credorText}${secPart} - R$ ${valorText} - NF ${nfText}.pdf`
         .replace(/[/\\?%*:|"<>]/g, '-');
 
       const opt = {
