@@ -189,20 +189,19 @@ async function createTemplate() {
           new Paragraph({
             style: "ParecerHeader",
             children: [
-              new TextRun({ text: "{#num_aditivo}", bold: true }),
+              new TextRun({ text: "{#has_aditivos_line}", bold: true }),
             ],
           }),
           new Paragraph({
             style: "ParecerHeader",
             children: [
-              new TextRun({ text: "Termo Aditivo n.º ", bold: true }),
-              new TextRun({ text: "{num_aditivo}", bold: true }),
+              new TextRun({ text: "{aditivos_line}", bold: true }),
             ],
           }),
           new Paragraph({
             style: "ParecerHeader",
             children: [
-              new TextRun({ text: "{/num_aditivo}", bold: true }),
+              new TextRun({ text: "{/has_aditivos_line}", bold: true }),
             ],
           }),
           new Paragraph({
@@ -381,7 +380,7 @@ async function createTemplate() {
             alignment: AlignmentType.CENTER,
             spacing: { line: 360 },
             children: [
-              new TextRun({ text: "Portaria Nº203/2025", bold: true, font: "Times New Roman" }),
+              new TextRun({ text: "Portaria N.º 203/2025", bold: true, font: "Times New Roman" }),
             ],
           }),
         ],

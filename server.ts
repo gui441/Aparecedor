@@ -59,6 +59,8 @@ Sua tarefa é analisar a imagem fornecida (que é tipicamente uma "Nota de Liqui
 - num_contrato: Número do Contrato. Verifique no "HISTÓRICO" onde frequentemente consta como "Contrato nº 02/2025" ou similar.
 - num_pregao: Número do Pregão Eletrônico (PE). Verifique no "HISTÓRICO" onde frequentemente consta como "Pregão Eletrônico nº 70/2024" ou similar.
 - num_aditivo: Número do Termo Aditivo. Verifique se consta como "Termo Aditivo n° 01/2025" ou similar.
+- num_apostilamento: Número do Termo de Apostilamento, se houver mencionado no documento.
+- num_adesao: Número da Adesão (ex: Adesão de SRP nº X / Adesão nº X), se houver mencionada no documento.
 - valor: O valor total ou valor liquidado do documento (formatado como "R$ X.XXX,XX"). ATENÇÃO CRÍTICA: Se houver campo "VALOR" no topo do empenho (ex: R$ 15.411,51) e campo "VALOR LIQUIDADO" no corpo/rodapé (ex: 8.785,35), você DEVE dar preferência absoluta e extrair o "VALOR LIQUIDADO" (ex: "R$ 8.785,35"), pois é este o valor efetivo de liquidação em auditoria para o parecer de pagamento.
 - credor: Razão Social ou Nome do Credor (a empresa contratada, ex: "NACIONAL PAX SERVIÇOS PÓSTUMOS LTDA"). Corrija erros de grafia, acentue palavras como "PÓSTUMOS" de forma correta se vier "POSTUMOS" e padronize "LTDA", "S/A", "ME" em maiúsculas profissionais.
 - cnpj: CNPJ do Credor (ex: "30.368.334/0001-83").
@@ -102,6 +104,8 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
                       num_contrato: { type: Type.STRING },
                       num_pregao: { type: Type.STRING },
                       num_aditivo: { type: Type.STRING },
+                      num_apostilamento: { type: Type.STRING },
+                      num_adesao: { type: Type.STRING },
                       valor: { type: Type.STRING },
                       credor: { type: Type.STRING },
                       cnpj: { type: Type.STRING },
@@ -184,8 +188,18 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
         });
 
         try {
+          const aditivosParts = [];
+          if (structured.num_aditivo) aditivosParts.push(`Termo Aditivo n.º ${structured.num_aditivo}`);
+          if (structured.num_apostilamento) aditivosParts.push(`Termo de Apostilamento n.º ${structured.num_apostilamento}`);
+          if (structured.num_adesao) aditivosParts.push(`Adesão n.º ${structured.num_adesao}`);
+          
+          const aditivosLine = aditivosParts.join(' – ');
+          const hasAditivosLine = aditivosParts.length > 0;
+
           doc.render({
             ...structured,
+            aditivos_line: aditivosLine,
+            has_aditivos_line: hasAditivosLine,
             title: title || 'PARECER DO CONTROLE INTERNO MUNICIPAL',
           });
         } catch (error) {
@@ -254,6 +268,8 @@ Retorne obrigatoriamente um objeto JSON com as mesmas propriedades revisadas.`;
               num_contrato: { type: Type.STRING },
               num_pregao: { type: Type.STRING },
               num_aditivo: { type: Type.STRING },
+              num_apostilamento: { type: Type.STRING },
+              num_adesao: { type: Type.STRING },
               valor: { type: Type.STRING },
               credor: { type: Type.STRING },
               cnpj: { type: Type.STRING },
@@ -264,7 +280,7 @@ Retorne obrigatoriamente um objeto JSON com as mesmas propriedades revisadas.`;
               mes: { type: Type.STRING },
               ano: { type: Type.STRING }
             },
-            required: ["num_processo", "num_nota_fiscal", "secretaria", "num_contrato", "num_pregao", "num_aditivo", "valor", "credor", "cnpj", "objeto", "num_empenho", "num_liquidacao", "dia", "mes", "ano"]
+            required: ["num_processo", "num_nota_fiscal", "secretaria", "num_contrato", "num_pregao", "num_aditivo", "num_apostilamento", "num_adesao", "valor", "credor", "cnpj", "objeto", "num_empenho", "num_liquidacao", "dia", "mes", "ano"]
           }
         }
       });

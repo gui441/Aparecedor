@@ -202,11 +202,17 @@ export const Editor: React.FC<EditorProps> = ({
           <div className={`w-full h-full grid grid-cols-1 md:grid-cols-2 gap-4 ${compactView ? '' : 'p-6 border border-border-base rounded-lg bg-white shadow-inner overflow-auto'}`}>
             
             {/* Group 1: Nº do Contrato, Nº do Processo, Pregão Eletrônico e Termo Aditivo */}
-            <div className="col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
               <InputField label="Contrato" value={structured?.num_contrato || ''} onChange={(val) => updateField('num_contrato', val)} />
               <InputField label="Processo" value={structured?.num_processo || ''} onChange={(val) => updateField('num_processo', val)} />
               <InputField label="Pregão Eletrônico" value={structured?.num_pregao || ''} onChange={(val) => updateField('num_pregao', val)} />
+            </div>
+
+            {/* Optional fields: Termo Aditivo, Termo de Apostilamento, Adesão */}
+            <div className="col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 border border-slate-200/60 p-4 rounded-2xl">
               <InputField label="Termo Aditivo" value={structured?.num_aditivo || ''} onChange={(val) => updateField('num_aditivo', val)} />
+              <InputField label="Termo de Apostilamento" value={structured?.num_apostilamento || ''} onChange={(val) => updateField('num_apostilamento', val)} />
+              <InputField label="Adesão" value={structured?.num_adesao || ''} onChange={(val) => updateField('num_adesao', val)} />
             </div>
 
             {/* Legislation Selector Toggles */}

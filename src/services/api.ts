@@ -163,8 +163,18 @@ export const apiService = {
         linebreaks: true,
       });
 
+      const aditivosParts = [];
+      if (structured.num_aditivo) aditivosParts.push(`Termo Aditivo n.º ${structured.num_aditivo}`);
+      if (structured.num_apostilamento) aditivosParts.push(`Termo de Apostilamento n.º ${structured.num_apostilamento}`);
+      if (structured.num_adesao) aditivosParts.push(`Adesão n.º ${structured.num_adesao}`);
+      
+      const aditivosLine = aditivosParts.join(' – ');
+      const hasAditivosLine = aditivosParts.length > 0;
+
       doc.render({
         ...structured,
+        aditivos_line: aditivosLine,
+        has_aditivos_line: hasAditivosLine,
         title: title || 'PARECER DO CONTROLE INTERNO MUNICIPAL',
       });
 

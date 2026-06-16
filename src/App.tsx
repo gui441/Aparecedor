@@ -151,7 +151,14 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
     <div className="header-field">Assunto: Análise do Processo Administrativo n.º {structuredData.num_processo}</div>
     <div className="header-field">Objeto: Pagamento da Nota Fiscal n.º {structuredData.num_nota_fiscal}, da Secretaria Municipal de {structuredData.secretaria} desta Municipalidade.</div>
     <div className="header-field">Contrato n.º {structuredData.num_contrato} – Pregão Eletrônico n.º {structuredData.num_pregao}</div>
-    {structuredData.num_aditivo ? <div className="header-field">Termo Aditivo n.º {structuredData.num_aditivo}</div> : null}
+    {(() => {
+      const parts = [];
+      if (structuredData.num_aditivo) parts.push(`Termo Aditivo n.º ${structuredData.num_aditivo}`);
+      if (structuredData.num_apostilamento) parts.push(`Termo de Apostilamento n.º ${structuredData.num_apostilamento}`);
+      if (structuredData.num_adesao) parts.push(`Adesão n.º ${structuredData.num_adesao}`);
+      if (parts.length === 0) return null;
+      return <div className="header-field">{parts.join(' – ')}</div>;
+    })()}
     <div className="header-field mb-3">Valor: {structuredData.valor?.toString().startsWith('R$') ? structuredData.valor : `R$ ${structuredData.valor}`}{structuredData.valor_extenso ? ` (${structuredData.valor_extenso})` : ''}</div>
 
     <p>
@@ -231,7 +238,7 @@ const ReportPage2 = ({ structuredData }: { structuredData: any }) => (
     <div className="signature-block no-indent">
       <div className="name uppercase">ANDERSON PEREIRA GOMES</div>
       <div className="text-[10pt] font-bold uppercase">CONTROLADOR GERAL INTERINO DO MUNICÍPIO</div>
-      <div className="text-[10pt] font-bold">Portaria Nº203/2025</div>
+      <div className="text-[10pt] font-bold">Portaria N.º 203/2025</div>
     </div>
   </>
 );
@@ -302,6 +309,8 @@ export default function App() {
       num_contrato: '',
       num_pregao: '',
       num_aditivo: '',
+      num_apostilamento: '',
+      num_adesao: '',
       valor: '',
       valor_extenso: '',
       credor: '',
@@ -417,6 +426,12 @@ export default function App() {
         // Termo Aditivo no histórico: "Termo Aditivo nº 01/2025" ou similar
         num_aditivo: text.match(/(?:Termo\s+Aditivo|Aditivo|TA)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
         
+        // Termo de Apostilamento no histórico
+        num_apostilamento: text.match(/(?:Termo\s+de\s+Apostilamento|Apostilamento)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
+        
+        // Adesão no histórico
+        num_adesao: text.match(/(?:Termo\s+de\s+Ades[ãa]o|Ades[ãa]o|Adesao)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
+        
         // Complex fields handled by keywords
         credor: findAfter(['Credor', 'RAZÃO SOCIAL', 'NOME DO CREDOR', 'CONTRATADA', 'EMPRESA'], 60),
         
@@ -489,6 +504,8 @@ export default function App() {
         - num_contrato: Número do contrato no histórico.
         - num_pregao: Número do Pregão (PE) no histórico.
         - num_aditivo: Número do Termo Aditivo, caso esteja mencionado no documento.
+        - num_apostilamento: Número do Termo de Apostilamento, caso esteja mencionado no documento.
+        - num_adesao: Número da Adesão (ex: Adesão de SRP nº X), caso esteja mencionada no documento.
         - valor: Valor total/liquidado (Ex: R$ 34.923,00).
         - credor: Razão Social ou Nome do Credor.
         - cnpj: CNPJ do Credor.
@@ -513,6 +530,8 @@ export default function App() {
                 num_contrato: { type: Type.STRING },
                 num_pregao: { type: Type.STRING },
                 num_aditivo: { type: Type.STRING },
+                num_apostilamento: { type: Type.STRING },
+                num_adesao: { type: Type.STRING },
                 valor: { type: Type.STRING },
                 credor: { type: Type.STRING },
                 cnpj: { type: Type.STRING },
