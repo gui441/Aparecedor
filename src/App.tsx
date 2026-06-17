@@ -530,33 +530,51 @@ export default function App() {
         Texto OCR:
         ${rawText}`;
 
-        const aiResult = await ai.models.generateContent({ 
-          model: "gemini-3.5-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                num_processo: { type: Type.STRING },
-                num_nota_fiscal: { type: Type.STRING },
-                secretaria: { type: Type.STRING },
-                num_contrato: { type: Type.STRING },
-                tipo_pregao: { type: Type.STRING },
-                num_pregao: { type: Type.STRING },
-                num_aditivo: { type: Type.STRING },
-                num_apostilamento: { type: Type.STRING },
-                num_adesao: { type: Type.STRING },
-                valor: { type: Type.STRING },
-                credor: { type: Type.STRING },
-                cnpj: { type: Type.STRING },
-                objeto: { type: Type.STRING },
-                num_empenho: { type: Type.STRING },
-                num_liquidacao: { type: Type.STRING },
+        const models = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+        let aiResult = null;
+        let lastError = null;
+        
+        for (const modelName of models) {
+          try {
+            console.log(`[Client Gemini Fallback] Tentando modelo: ${modelName}`);
+            const result = await ai.models.generateContent({ 
+              model: modelName,
+              contents: prompt,
+              config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                    num_processo: { type: Type.STRING },
+                    num_nota_fiscal: { type: Type.STRING },
+                    secretaria: { type: Type.STRING },
+                    num_contrato: { type: Type.STRING },
+                    tipo_pregao: { type: Type.STRING },
+                    num_pregao: { type: Type.STRING },
+                    num_aditivo: { type: Type.STRING },
+                    num_apostilamento: { type: Type.STRING },
+                    num_adesao: { type: Type.STRING },
+                    valor: { type: Type.STRING },
+                    credor: { type: Type.STRING },
+                    cnpj: { type: Type.STRING },
+                    objeto: { type: Type.STRING },
+                    num_empenho: { type: Type.STRING },
+                    num_liquidacao: { type: Type.STRING },
+                  }
+                }
               }
-            }
+            });
+            aiResult = result;
+            break; // Succeeded! Exit retry loop
+          } catch (err) {
+            console.warn(`[Client Gemini Fallback] Falha com modelo ${modelName}:`, err);
+            lastError = err;
           }
-        });
+        }
+
+        if (!aiResult) {
+          throw lastError || new Error('Não foi possível obter resposta do servidor de IA do Gemini.');
+        }
 
         const aiStructured = JSON.parse(aiResult.text || '{}');
         if (aiStructured.valor) {

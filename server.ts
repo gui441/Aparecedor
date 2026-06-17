@@ -11,6 +11,26 @@ import { GoogleGenAI, Type } from "@google/genai";
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 
+async function callGeminiWithFallback(ai: any, params: any) {
+  const models = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  let lastError: any = null;
+  
+  for (const model of models) {
+    try {
+      console.log(`[Gemini Fallback] Tentando modelo: ${model}`);
+      const response = await ai.models.generateContent({
+        ...params,
+        model: model
+      });
+      return response;
+    } catch (err) {
+      console.warn(`[Gemini Fallback] Falha com modelo ${model}:`, err ? (err as any).message || err : err);
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -73,8 +93,7 @@ Durante a extração, aplique automaticamente essa camada de correção e polime
 
 Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcrição completa e limpa do OCR) e 'structured' (um objeto contendo exatamente as chaves listadas acima). Se um campo não estiver presente de forma alguma no documento, retorne "".`;
 
-          const response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash',
+          const response = await callGeminiWithFallback(ai, {
             contents: [
               {
                 inlineData: {
@@ -257,8 +276,7 @@ ${JSON.stringify(structured, null, 2)}
 
 Retorne obrigatoriamente um objeto JSON com as mesmas propriedades revisadas.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+      const response = await callGeminiWithFallback(ai, {
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
