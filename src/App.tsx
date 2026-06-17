@@ -102,7 +102,7 @@ export function cleanObjeto(obj: string): string {
                    .replace(/\s*-\s*$/g, '')
                    .trim();
 
-  return cleaned.toLowerCase();
+  return cleaned;
 }
 
 export function cleanCredor(credor: string): string {
