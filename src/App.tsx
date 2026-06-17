@@ -150,7 +150,7 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
     
     <div className="header-field">Assunto: Análise do Processo Administrativo n.º {structuredData.num_processo}</div>
     <div className="header-field">Objeto: Pagamento da Nota Fiscal n.º {structuredData.num_nota_fiscal}, da Secretaria Municipal de {structuredData.secretaria} desta Municipalidade.</div>
-    <div className="header-field">Contrato n.º {structuredData.num_contrato} – Pregão Eletrônico n.º {structuredData.num_pregao}</div>
+    <div className="header-field">Contrato n.º {structuredData.num_contrato} – {structuredData.tipo_pregao || 'Pregão Eletrônico'} n.º {structuredData.num_pregao}</div>
     {(() => {
       const parts = [];
       if (structuredData.num_aditivo) parts.push(`Termo Aditivo n.º ${structuredData.num_aditivo}`);
@@ -307,6 +307,7 @@ export default function App() {
       num_nota_fiscal: '',
       secretaria: '',
       num_contrato: '',
+      tipo_pregao: 'Pregão Eletrônico',
       num_pregao: '',
       num_aditivo: '',
       num_apostilamento: '',
@@ -423,6 +424,18 @@ export default function App() {
         // Pregão no histórico: "Pregão Eletrônico n° 53/2025" ou "PE nº 53/2025"
         num_pregao: text.match(/(?:PE|Pregão|Pregao)(?:\s+Eletr[ôo]nico)?\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
 
+        // Detect modality/tipo_pregao
+        tipo_pregao: (() => {
+          if (text.match(/Inexigibilidade/i)) return 'Inexigibilidade';
+          if (text.match(/Dispensa/i)) return 'Dispensa';
+          if (text.match(/Pregão\s+Presencial/i)) return 'Pregão Presencial';
+          if (text.match(/Concorrência\s+Pública/i)) return 'Concorrência Pública';
+          if (text.match(/Concorrência\s+Eletrônica/i)) return 'Concorrência Eletrônica';
+          if (text.match(/Credenciamento/i)) return 'Credenciamento';
+          if (text.match(/Chamamento/i)) return 'Chamamento Público';
+          return 'Pregão Eletrônico';
+        })(),
+
         // Termo Aditivo no histórico: "Termo Aditivo nº 01/2025" ou similar
         num_aditivo: text.match(/(?:Termo\s+Aditivo|Aditivo|TA)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
         
@@ -502,6 +515,7 @@ export default function App() {
         - num_nota_fiscal: Número da NF ou NF-e.
         - secretaria: O nome específico da secretaria (ex: "Saúde", "Educação", "Planejamento, Orçamento e Gestão", "Assistência Social"). Sem prefixos "Secretaria Municipal de".
         - num_contrato: Número do contrato no histórico.
+        - tipo_pregao: O tipo/modalidade do procedimento ou licitação (ex: 'Pregão Eletrônico', 'Inexigibilidade', 'Pregão Presencial', 'Concorrência Pública', 'Dispensa', 'Concorrência Eletrônica'). Caso seja mencionado 'Pregão Eletrônico' ou se refira a um pregão eletrônico, defina como 'Pregão Eletrônico'.
         - num_pregao: Número do Pregão (PE) no histórico.
         - num_aditivo: Número do Termo Aditivo, caso esteja mencionado no documento.
         - num_apostilamento: Número do Termo de Apostilamento, caso esteja mencionado no documento.
@@ -528,6 +542,7 @@ export default function App() {
                 num_nota_fiscal: { type: Type.STRING },
                 secretaria: { type: Type.STRING },
                 num_contrato: { type: Type.STRING },
+                tipo_pregao: { type: Type.STRING },
                 num_pregao: { type: Type.STRING },
                 num_aditivo: { type: Type.STRING },
                 num_apostilamento: { type: Type.STRING },

@@ -57,7 +57,8 @@ Sua tarefa é analisar a imagem fornecida (que é tipicamente uma "Nota de Liqui
 - num_nota_fiscal: Número da Nota Fiscal (NF, NF-e, NFS-e). Na Nota de Liquidação, costuma constar na linha "Nota fiscal mercadoria/servico 2012 série A" ou no histórico "Liquidação de NFS-e nº 2012" ou "NFS-e n° 2012". Extraia apenas o número principal de identificação da NF (ex: "2012").
 - secretaria: O NOME ESPECÍFICO da Secretaria, Órgão ou Unidade Orçamentária/Destinatária (ex: "Saúde", "Educação", "Planejamento, Orçamento e Gestão", "Assistência Social"). ATENÇÃO CRÍTICA: Você deve IGNORAR e OMITIR inteiramente os prefixos "Secretaria Municipal de", "Secretaria de", "SEC DE", "SEC MUNICIPAL DE", "Fundo Municipal de" e variantes semelhantes. Além disso, CORRIJA IMEDIATAMENTE quaisquer erros ou grafias de digitação/OCR como "Assistêcia", "Assistecia", "Secreteria" ou "Fundo Municipal de Assistência Social" para "Assistência Social". Extraia apenas o nome próprio do órgão com Capitalização Adequada.
 - num_contrato: Número do Contrato. Verifique no "HISTÓRICO" onde frequentemente consta como "Contrato nº 02/2025" ou similar.
-- num_pregao: Número do Pregão Eletrônico (PE). Verifique no "HISTÓRICO" onde frequentemente consta como "Pregão Eletrônico nº 70/2024" ou similar.
+- tipo_pregao: O tipo ou modalidade de contratação ou licitação (ex: 'Pregão Eletrônico', 'Inexigibilidade', 'Pregão Presencial', 'Concorrência Pública', 'Dispensa', 'Concorrência Eletrônica'). Se for um pregão eletrônico ou houver menção a PE nº, use 'Pregão Eletrônico'.
+- num_pregao: Número do Pregão Eletrônico (PE) ou similar, associado à modalidade acima. Verifique no "HISTÓRICO" onde frequentemente consta como "Pregão Eletrônico nº 70/2024" ou "Dispensa nº X" ou "Pregão Presencial nº X". Extraia apenas o número (ex: "70/2024").
 - num_aditivo: Número do Termo Aditivo. Verifique se consta como "Termo Aditivo n° 01/2025" ou similar.
 - num_apostilamento: Número do Termo de Apostilamento, se houver mencionado no documento.
 - num_adesao: Número da Adesão (ex: Adesão de SRP nº X / Adesão nº X), se houver mencionada no documento.
@@ -102,6 +103,7 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
                       num_nota_fiscal: { type: Type.STRING },
                       secretaria: { type: Type.STRING },
                       num_contrato: { type: Type.STRING },
+                      tipo_pregao: { type: Type.STRING },
                       num_pregao: { type: Type.STRING },
                       num_aditivo: { type: Type.STRING },
                       num_apostilamento: { type: Type.STRING },
@@ -197,6 +199,7 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
           const hasAditivosLine = aditivosParts.length > 0;
 
           doc.render({
+            tipo_pregao: 'Pregão Eletrônico',
             ...structured,
             aditivos_line: aditivosLine,
             has_aditivos_line: hasAditivosLine,
@@ -266,6 +269,7 @@ Retorne obrigatoriamente um objeto JSON com as mesmas propriedades revisadas.`;
               num_nota_fiscal: { type: Type.STRING },
               secretaria: { type: Type.STRING },
               num_contrato: { type: Type.STRING },
+              tipo_pregao: { type: Type.STRING },
               num_pregao: { type: Type.STRING },
               num_aditivo: { type: Type.STRING },
               num_apostilamento: { type: Type.STRING },
@@ -280,7 +284,7 @@ Retorne obrigatoriamente um objeto JSON com as mesmas propriedades revisadas.`;
               mes: { type: Type.STRING },
               ano: { type: Type.STRING }
             },
-            required: ["num_processo", "num_nota_fiscal", "secretaria", "num_contrato", "num_pregao", "num_aditivo", "num_apostilamento", "num_adesao", "valor", "credor", "cnpj", "objeto", "num_empenho", "num_liquidacao", "dia", "mes", "ano"]
+            required: ["num_processo", "num_nota_fiscal", "secretaria", "num_contrato", "tipo_pregao", "num_pregao", "num_aditivo", "num_apostilamento", "num_adesao", "valor", "credor", "cnpj", "objeto", "num_empenho", "num_liquidacao", "dia", "mes", "ano"]
           }
         }
       });

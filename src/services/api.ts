@@ -172,6 +172,7 @@ export const apiService = {
       const hasAditivosLine = aditivosParts.length > 0;
 
       doc.render({
+        tipo_pregao: 'Pregão Eletrônico',
         ...structured,
         aditivos_line: aditivosLine,
         has_aditivos_line: hasAditivosLine,

@@ -182,7 +182,9 @@ async function createTemplate() {
             children: [
               new TextRun({ text: "Contrato n.º ", bold: true }),
               new TextRun({ text: "{num_contrato}", bold: true }),
-              new TextRun({ text: " – Pregão Eletrônico n.º ", bold: true }),
+              new TextRun({ text: " – ", bold: true }),
+              new TextRun({ text: "{tipo_pregao}", bold: true }),
+              new TextRun({ text: " n.º ", bold: true }),
               new TextRun({ text: "{num_pregao}", bold: true }),
             ],
           }),

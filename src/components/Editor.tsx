@@ -3,6 +3,17 @@ import { FileDown, Edit3, Clipboard, Check, Printer, AlertCircle, HelpCircle } f
 import { motion } from 'motion/react';
 import { valorPorExtenso, formatarReal, formatarCNPJ, validarCNPJ } from '../utils/currency';
 
+export const PROCUREMENT_MODALITIES = [
+  'Pregão Eletrônico',
+  'Inexigibilidade',
+  'Pregão Presencial',
+  'Concorrência Pública',
+  'Dispensa',
+  'Concorrência Eletrônica',
+  'Credenciamento',
+  'Chamamento Público'
+];
+
 interface EditorProps {
   content: string;
   structured: any;
@@ -201,12 +212,50 @@ export const Editor: React.FC<EditorProps> = ({
         {viewMode === 'form' ? (
           <div className={`w-full h-full grid grid-cols-1 md:grid-cols-2 gap-4 ${compactView ? '' : 'p-6 border border-border-base rounded-lg bg-white shadow-inner overflow-auto'}`}>
             
-            {/* Group 1: Nº do Contrato, Nº do Processo, Pregão Eletrônico e Termo Aditivo */}
-            <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Group 1: Nº do Contrato, Nº do Processo, Tipo de Contratação e Número */}
+            <div className="col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               <InputField label="Contrato" value={structured?.num_contrato || ''} onChange={(val) => updateField('num_contrato', val)} />
               <InputField label="Processo" value={structured?.num_processo || ''} onChange={(val) => updateField('num_processo', val)} />
-              <InputField label="Pregão Eletrônico" value={structured?.num_pregao || ''} onChange={(val) => updateField('num_pregao', val)} />
+              
+              <div className="space-y-1">
+                <label className="text-[10.5px] font-extrabold text-[#64748b] uppercase tracking-wider block">Tipo de Contratação</label>
+                <select
+                  value={PROCUREMENT_MODALITIES.includes(structured?.tipo_pregao || 'Pregão Eletrônico') ? (structured?.tipo_pregao || 'Pregão Eletrônico') : 'Outro'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'Outro') {
+                      updateField('tipo_pregao', 'Outro Procedimento');
+                    } else {
+                      updateField('tipo_pregao', val);
+                    }
+                  }}
+                  className="w-full h-11 px-3 border border-[#e2e8f0] rounded-xl text-xs sm:text-sm bg-white focus:border-[#2563eb] focus:ring-2 focus:ring-blue-50 outline-none transition-all cursor-pointer font-sans"
+                >
+                  {PROCUREMENT_MODALITIES.map((mod) => (
+                    <option key={mod} value={mod}>{mod}</option>
+                  ))}
+                  <option value="Outro">Outro (Especificar...)</option>
+                </select>
+              </div>
+
+              <InputField 
+                label={`N.º do/da ${structured?.tipo_pregao || 'Pregão Eletrônico'}`} 
+                value={structured?.num_pregao || ''} 
+                onChange={(val) => updateField('num_pregao', val)} 
+              />
             </div>
+
+            {/* Custom Procurement Type Field if "Outro" is specified */}
+            {!PROCUREMENT_MODALITIES.includes(structured?.tipo_pregao || 'Pregão Eletrônico') && (
+              <div className="col-span-2 md:col-start-3 md:col-span-2">
+                <InputField 
+                  label="Especifique o Tipo/Modalidade de Contratação" 
+                  value={structured?.tipo_pregao || ''} 
+                  onChange={(val) => updateField('tipo_pregao', val)} 
+                  fullWidth
+                />
+              </div>
+            )}
 
             {/* Optional fields: Termo Aditivo, Termo de Apostilamento, Adesão */}
             <div className="col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 border border-slate-200/60 p-4 rounded-2xl">
