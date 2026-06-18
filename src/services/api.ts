@@ -10,19 +10,86 @@ export interface ExtractionResult {
   structured?: any;
 }
 
+function compressImageIfNeeded(file: File, maxDimension = 1800, quality = 0.85): Promise<File> {
+  if (!file.type.startsWith('image/')) {
+    return Promise.resolve(file);
+  }
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        // Se a imagem já for leve e menor que a dimensão máxima, envia original
+        if (width <= maxDimension && height <= maxDimension && file.size < 500 * 1024) {
+          resolve(file);
+          return;
+        }
+
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const compressedFile = new File([blob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+          });
+          console.log(`Imagem otimizada para OCR: de ${(file.size / 1024 / 1024).toFixed(2)}MB para ${(compressedFile.size / 1024).toFixed(0)}KB`);
+          resolve(compressedFile);
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
 export const apiService = {
   async extractText(file: File, onProgress?: (message: string) => void): Promise<ExtractionResult> {
+    if (onProgress) onProgress('Otimizando tamanho da imagem para processamento ultra rápido...');
+    const optimizedFile = await compressImageIfNeeded(file);
+    
     // Para testar PURAMENTE com Tesseract.js (leitura/OCR com IA desativada temporariamente)
     const enableServerIA = true;
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
     if (enableServerIA && isOnline) {
       try {
-        console.log('Iniciando OCR de alta fidelidade pelo servidor para o arquivo:', file.name);
+        console.log('Iniciando OCR de alta fidelidade pelo servidor para o arquivo:', optimizedFile.name);
         if (onProgress) onProgress('Processando imagem com IA de alta fidelidade...');
 
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('image', optimizedFile);
 
         const response = await fetch('/api/extract', {
           method: 'POST',
@@ -49,7 +116,7 @@ export const apiService = {
 
     // 2. Client-side compilation with clean, pristine Tesseract directly on the original high-quality file
     try {
-      console.log('Iniciando OCR local com Tesseract.js diretamente no arquivo original...');
+      console.log('Iniciando OCR local com Tesseract.js diretamente no arquivo otimizado...');
       if (onProgress) onProgress('Preparando motor de OCR local...');
 
       const worker = await createWorker('por', 1, {
@@ -79,7 +146,7 @@ export const apiService = {
       });
 
       if (onProgress) onProgress('Extraindo texto do documento digitalizado...');
-      const { data: { text: rawText } } = await worker.recognize(file);
+      const { data: { text: rawText } } = await worker.recognize(optimizedFile);
       console.log('Reconhecimento local concluído, tamanho do texto:', rawText?.length);
       
       await worker.terminate();
