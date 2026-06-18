@@ -102,6 +102,10 @@ export function cleanObjeto(obj: string): string {
                    .replace(/\s*-\s*$/g, '')
                    .trim();
 
+  if (cleaned.length > 0) {
+    cleaned = cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+  }
+
   return cleaned;
 }
 

@@ -132,8 +132,10 @@ export const Editor: React.FC<EditorProps> = ({
 
   const forceFormatObjeto = () => {
     if (structured?.objeto) {
-      const formatted = structured.objeto
-        .trim();
+      let formatted = structured.objeto.trim();
+      if (formatted.length > 0) {
+        formatted = formatted.charAt(0).toLowerCase() + formatted.slice(1);
+      }
       onStructuredChange({
         ...structured,
         objeto: formatted
