@@ -121,7 +121,6 @@ export const apiService = {
 
       const worker = await createWorker('por', 1, {
         logger: m => {
-          console.log('Tesseract:', m);
           if (onProgress && typeof m === 'object' && m !== null) {
             if (m.status === 'recognizing text') {
               onProgress(`Reconhecendo (Modo Local): ${Math.round(m.progress * 100)}%`);

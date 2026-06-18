@@ -21,16 +21,9 @@ async function createTemplate() {
   }
 
   if (!bgImage) {
-    try {
-      // Fallback for testing if local file is missing or empty
-      const bgRes = await fetch('https://picsum.photos/seed/legal-pad/1200/1600?grayscale&blur=1');
-      if (bgRes.ok) {
-        bgImage = Buffer.from(await bgRes.arrayBuffer());
-        console.log('Using fallback timbrado image');
-      }
-    } catch (err) {
-      console.error('Failed to fetch fallback image:', err);
-    }
+    // Hardcoded lightweight transparent 1x1 PNG to avoid slow network fetches and potential sandbox timeouts
+    bgImage = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+    console.log('Using fast local fallback transparent PNG instead of remote fetch');
   }
 
   const doc = new Document({
