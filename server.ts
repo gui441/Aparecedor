@@ -31,6 +31,41 @@ async function callGeminiWithFallback(ai: any, params: any) {
   throw lastError;
 }
 
+function cleanOptionalField(val: any): string {
+  if (val === undefined || val === null) return '';
+  let str = String(val).trim();
+  const lower = str.toLowerCase();
+  
+  if (!str || 
+      lower === 'n/a' || 
+      lower === 'na' ||
+      lower === 'não' ||
+      lower === 'nao' ||
+      lower === 'não consta' || 
+      lower === 'nao consta' || 
+      lower === 'não aplicável' || 
+      lower === 'nao aplicavel' || 
+      lower === 'não se aplica' || 
+      lower === 'nao se aplica' || 
+      lower === 'sem' || 
+      lower === 'null' || 
+      lower === 'undefined' ||
+      lower.includes('não consta') ||
+      lower.includes('não se aplica') ||
+      lower.includes('não aplicável') ||
+      lower.includes('não mencionado') ||
+      lower.includes('nao mencionado')
+  ) {
+    return '';
+  }
+  
+  if (!/\d/.test(str)) {
+    return '';
+  }
+  
+  return str;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -79,9 +114,9 @@ Sua tarefa é analisar a imagem fornecida (que é tipicamente uma "Nota de Liqui
 - num_contrato: Número do Contrato. Verifique no "HISTÓRICO" onde frequentemente consta como "Contrato nº 02/2025" ou similar.
 - tipo_pregao: O tipo ou modalidade de contratação ou licitação (ex: 'Pregão Eletrônico', 'Inexigibilidade', 'Pregão Presencial', 'Concorrência Pública', 'Dispensa', 'Concorrência Eletrônica'). Se for um pregão eletrônico ou houver menção a PE nº, use 'Pregão Eletrônico'.
 - num_pregao: Número do Pregão Eletrônico (PE) ou similar, associado à modalidade acima. Verifique no "HISTÓRICO" onde frequentemente consta como "Pregão Eletrônico nº 70/2024" ou "Dispensa nº X" ou "Pregão Presencial nº X". Extraia apenas o número (ex: "70/2024").
-- num_aditivo: Número do Termo Aditivo. Verifique se consta como "Termo Aditivo n° 01/2025" ou similar.
-- num_apostilamento: Número do Termo de Apostilamento, se houver mencionado no documento.
-- num_adesao: Número da Adesão (ex: Adesão de SRP nº X / Adesão nº X), se houver mencionada no documento.
+- num_aditivo: Número do Termo Aditivo. Verifique se consta como "Termo Aditivo n° 01/2025" ou similar. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
+- num_apostilamento: Número do Termo de Apostilamento, se houver mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
+- num_adesao: Número da Adesão (ex: Adesão de SRP nº X / Adesão nº X), se houver mencionada no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
 - valor: O valor total ou valor liquidado do documento (formatado como "R$ X.XXX,XX"). ATENÇÃO CRÍTICA: Se houver campo "VALOR" no topo do empenho (ex: R$ 15.411,51) e campo "VALOR LIQUIDADO" no corpo/rodapé (ex: 8.785,35), você DEVE dar preferência absoluta e extrair o "VALOR LIQUIDADO" (ex: "R$ 8.785,35"), pois é este o valor efetivo de liquidação em auditoria para o parecer de pagamento.
 - credor: Razão Social ou Nome do Credor (a empresa contratada, ex: "NACIONAL PAX SERVIÇOS PÓSTUMOS LTDA"). Corrija erros de grafia, acentue palavras como "PÓSTUMOS" de forma correta se vier "POSTUMOS" e padronize "LTDA", "S/A", "ME" em maiúsculas profissionais.
 - cnpj: CNPJ do Credor (ex: "30.368.334/0001-83").
@@ -145,9 +180,15 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
           if (resultText) {
             const parsed = JSON.parse(resultText);
             console.log('Extração Gemini concluída com sucesso!');
+            const structured = parsed.structured || {};
+            // Limpa os campos opcionais
+            if (structured.num_aditivo !== undefined) structured.num_aditivo = cleanOptionalField(structured.num_aditivo);
+            if (structured.num_apostilamento !== undefined) structured.num_apostilamento = cleanOptionalField(structured.num_apostilamento);
+            if (structured.num_adesao !== undefined) structured.num_adesao = cleanOptionalField(structured.num_adesao);
+
             return res.json({
               text: parsed.text || '',
-              structured: parsed.structured || {}
+              structured: structured
             });
           }
         } catch (geminiError) {
@@ -270,6 +311,7 @@ Instruções específicas para correção:
 3. Objeto do Parecer/Contrato: Corrija a concordância, pontuação, exclua lixo de digitalização ou caracteres avulsos. Complete termos truncados e corrija erros como "forncimento" -> "fornecimento", "aditio" -> "aditivo", "prestacao" -> "prestação", "aquisicao" -> "aquisição", "manutencao" -> "manutenção". ATENÇÃO CRÍTICA: Você deve IGNORAR, OMITIR ou REMOVER inteiramente do texto do objeto qualquer menção à Secretaria atendida/destinatária (ex: de "fornecimento de bens e serviços fúnebres, para atender as necessidades da Secretaria de Assistência Social", deixe APENAS "fornecimento de bens e serviços fúnebres").
 4. Unidades e Números: Preserve integralmente quaisquer dígitos referentes a CPF, CNPJ, números de contratos, processos e empenhos. Conserte somente pontuações inadequadas neles, mantendo os dígitos exatos intactos.
 5. Preservação Factual: Em hipótese alguma invente informações novas ou altere valores financeiros, pois são dados de auditoria legalmente vinculantes.
+6. Campos opcionais (termo aditivo, termo de apostilamento e de adesão): Se estes campos vierem preenchidos no rascunho com expressões de ausência (como "N/A", "Não consta", "Não se aplica", "Não aplicável", "Sem", "NULL", etc.) ou sem números válidos, ou se não existirem no documento de origem, você DEVE limpá-los obrigatoriamente e deixá-los como string vazia ("").
 
 Abaixo estão os dados rascunhados em formato JSON:
 ${JSON.stringify(structured, null, 2)}
@@ -310,6 +352,11 @@ Retorne obrigatoriamente um objeto JSON com as mesmas propriedades revisadas.`;
       const responseText = response.text;
       if (responseText) {
         const corrected = JSON.parse(responseText);
+        if (corrected) {
+          if (corrected.num_aditivo !== undefined) corrected.num_aditivo = cleanOptionalField(corrected.num_aditivo);
+          if (corrected.num_apostilamento !== undefined) corrected.num_apostilamento = cleanOptionalField(corrected.num_apostilamento);
+          if (corrected.num_adesao !== undefined) corrected.num_adesao = cleanOptionalField(corrected.num_adesao);
+        }
         return res.json({ corrected });
       }
       return res.status(500).json({ error: 'Nenhuma resposta retornada do corretor.' });

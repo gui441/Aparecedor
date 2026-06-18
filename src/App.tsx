@@ -109,6 +109,42 @@ export function cleanObjeto(obj: string): string {
   return cleaned;
 }
 
+// Limpa campos opcionais de ausência (termo aditivo, apostilamento e adesão)
+export function cleanOptionalField(val: any): string {
+  if (val === undefined || val === null) return '';
+  let str = String(val).trim();
+  const lower = str.toLowerCase();
+  
+  if (!str || 
+      lower === 'n/a' || 
+      lower === 'na' ||
+      lower === 'não' ||
+      lower === 'nao' ||
+      lower === 'não consta' || 
+      lower === 'nao consta' || 
+      lower === 'não aplicável' || 
+      lower === 'nao aplicavel' || 
+      lower === 'não se aplica' || 
+      lower === 'nao se aplica' || 
+      lower === 'sem' || 
+      lower === 'null' || 
+      lower === 'undefined' ||
+      lower.includes('não consta') ||
+      lower.includes('não se aplica') ||
+      lower.includes('não aplicável') ||
+      lower.includes('não mencionado') ||
+      lower.includes('nao mencionado')
+  ) {
+    return '';
+  }
+  
+  if (!/\d/.test(str)) {
+    return '';
+  }
+  
+  return str;
+}
+
 export function cleanCredor(credor: string): string {
   if (!credor) return '';
   return credor
@@ -353,6 +389,9 @@ export default function App() {
         // No client-side regex or second refinement LLM call is required.
         setStructuredData({
           ...serverStructured,
+          num_aditivo: cleanOptionalField(serverStructured.num_aditivo),
+          num_apostilamento: cleanOptionalField(serverStructured.num_apostilamento),
+          num_adesao: cleanOptionalField(serverStructured.num_adesao),
           credor: cleanCredor(serverStructured.credor || ''),
           valor_extenso: valorPorExtenso(serverStructured.valor || ''),
           secretaria: cleanSecretaria(serverStructured.secretaria),
@@ -473,6 +512,9 @@ export default function App() {
       // Date pre-fill and clean
       const initialData = {
         ...regexData,
+        num_aditivo: cleanOptionalField(regexData.num_aditivo),
+        num_apostilamento: cleanOptionalField(regexData.num_apostilamento),
+        num_adesao: cleanOptionalField(regexData.num_adesao),
         credor: cleanCredor(regexData.credor || ''),
         valor_extenso: valorPorExtenso(regexData.valor || ''),
         secretaria: cleanSecretaria(regexData.secretaria),
@@ -521,9 +563,9 @@ export default function App() {
         - num_contrato: Número do contrato no histórico.
         - tipo_pregao: O tipo/modalidade do procedimento ou licitação (ex: 'Pregão Eletrônico', 'Inexigibilidade', 'Pregão Presencial', 'Concorrência Pública', 'Dispensa', 'Concorrência Eletrônica'). Caso seja mencionado 'Pregão Eletrônico' ou se refira a um pregão eletrônico, defina como 'Pregão Eletrônico'.
         - num_pregao: Número do Pregão (PE) no histórico.
-        - num_aditivo: Número do Termo Aditivo, caso esteja mencionado no documento.
-        - num_apostilamento: Número do Termo de Apostilamento, caso esteja mencionado no documento.
-        - num_adesao: Número da Adesão (ex: Adesão de SRP nº X), caso esteja mencionada no documento.
+        - num_aditivo: Número do Termo Aditivo, caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
+        - num_apostilamento: Número do Termo de Apostilamento, caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
+        - num_adesao: Número da Adesão (ex: Adesão de SRP nº X), caso esteja mencionada no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
         - valor: Valor total/liquidado (Ex: R$ 34.923,00).
         - credor: Razão Social ou Nome do Credor.
         - cnpj: CNPJ do Credor.
@@ -591,6 +633,9 @@ export default function App() {
           return {
             ...prev,
             ...aiStructured,
+            num_aditivo: cleanOptionalField(aiStructured.num_aditivo !== undefined ? aiStructured.num_aditivo : prev.num_aditivo),
+            num_apostilamento: cleanOptionalField(aiStructured.num_apostilamento !== undefined ? aiStructured.num_apostilamento : prev.num_apostilamento),
+            num_adesao: cleanOptionalField(aiStructured.num_adesao !== undefined ? aiStructured.num_adesao : prev.num_adesao),
             credor: cleanCredor(aiStructured.credor || prev.credor || ''),
             valor_extenso: valorPorExtenso(rawVal),
             secretaria: cleanSecretaria(aiStructured.secretaria || prev.secretaria || ''),
