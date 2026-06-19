@@ -70,6 +70,17 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Diagnostic request logger
+  app.use((req, res, next) => {
+    const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url}\n`;
+    try {
+      fs.appendFileSync('./server_requests.log', logLine);
+    } catch (e) {
+      console.error('Failed to write request log:', e);
+    }
+    next();
+  });
+
   app.use(cors());
   app.use(express.json());
 
