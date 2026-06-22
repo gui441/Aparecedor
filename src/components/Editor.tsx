@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileDown, Edit3, Clipboard, Check, Printer, AlertCircle, HelpCircle } from 'lucide-react';
+import { FileDown, Edit3, Clipboard, Check, AlertCircle, HelpCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { valorPorExtenso, formatarReal, formatarCNPJ, validarCNPJ } from '../utils/currency';
 
@@ -451,16 +451,7 @@ export const Editor: React.FC<EditorProps> = ({
             )}
           </button>
 
-          <button
-            onClick={() => {
-              window.focus();
-              window.print();
-            }}
-            className="btn h-10 px-5 rounded-lg bg-emerald-600 text-white text-sm font-semibold flex items-center gap-2 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Imprimir</span>
-          </button>
+
 
           <button
             onClick={() => window.location.reload()}

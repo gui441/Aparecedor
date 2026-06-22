@@ -1,14 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { ScannerFolderConfig } from './components/ScannerFolderConfig';
+import { getScannerHandle, saveScannerHandle, clearScannerHandle } from './utils/scannerStorage';
 import { Editor } from './components/Editor';
 import { apiService } from './services/api';
 import { AlertCircle, Layout, Printer, Info, Sparkles, Check, Settings, Key, X, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { valorPorExtenso } from './utils/currency';
-// @ts-ignore
-import html2pdf from 'html2pdf.js';
 
 export enum AppStep {
   CHOICE = 'CHOICE',
@@ -306,12 +305,214 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isExporting, setIsExporting] = useState(false);
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoPrint, setAutoPrint] = useState<boolean>(() => {
-    return localStorage.getItem('autoPrint') === 'true';
-  });
   const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  // --- INTEGRATED PERSISTENT SCANNER FOLDER STATES ---
+  const [scannerDirHandle, setScannerDirHandle] = useState<any | null>(null);
+  const [isScannerMonitoring, setIsScannerMonitoring] = useState(false);
+  const [isScannerReading, setIsScannerReading] = useState(false);
+  const [scannerFiles, setScannerFiles] = useState<any[]>([]);
+  const [autoImportScanner, setAutoImportScanner] = useState(true);
+  const [scannerPermission, setScannerPermission] = useState<'granted' | 'prompt' | 'denied' | null>(null);
+
+  const scannerStartTimeRef = useRef<number>(0);
+  const scannerImportedFilesRef = useRef<Set<string>>(new Set<string>());
+  const scannerIntervalRef = useRef<any>(null);
+
+  // Audio Beep Feedback
+  const playSuccessBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.1); // A5
+        
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+        
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      }
+    } catch (e) {
+      console.warn('Audio feedback failed:', e);
+    }
+  };
+
+  // Read files helper
+  const readScannerDirectory = async (handle: any, silent = false) => {
+    if (!handle) return [];
+    if (!silent) setIsScannerReading(true);
+
+    try {
+      const options = { mode: 'read' as const };
+      const currentPerm = await handle.queryPermission(options);
+      setScannerPermission(currentPerm);
+      
+      if (currentPerm !== 'granted') {
+        if (!silent) {
+          const reqPerm = await handle.requestPermission(options);
+          setScannerPermission(reqPerm);
+          if (reqPerm !== 'granted') {
+            throw new Error('Permissão negada.');
+          }
+        } else {
+          return []; // Skip if silent and no permission
+        }
+      }
+
+      const files: any[] = [];
+      for await (const entry of handle.values()) {
+        if (entry.kind === 'file') {
+          const file = await entry.getFile();
+          if (file.type.startsWith('image/')) {
+            files.push({
+              name: entry.name,
+              size: file.size,
+              lastModified: file.lastModified,
+              handle: entry
+            });
+          }
+        }
+      }
+
+      files.sort((a, b) => b.lastModified - a.lastModified);
+      setScannerFiles(files);
+      return files;
+    } catch (err) {
+      console.error('Erro ao ler diretório do scanner:', err);
+      return [];
+    } finally {
+      if (!silent) setIsScannerReading(false);
+    }
+  };
+
+  // Convert and Import single scanned file
+  const handleImportScannerFile = async (info: any) => {
+    try {
+      const file = await info.handle.getFile();
+      handleExtraction(file);
+      scannerImportedFilesRef.current.add(`${info.name}-${info.lastModified}`);
+    } catch (err) {
+      console.error('Erro ao importar arquivo do scanner:', err);
+    }
+  };
+
+  // Poll Check function
+  const runScannerPollCheck = async (handle: any) => {
+    if (!handle) return;
+    try {
+      const currentFiles = await readScannerDirectory(handle, true);
+      if (currentFiles.length === 0) return;
+
+      const latestFile = currentFiles[0];
+      const uniqueKey = `${latestFile.name}-${latestFile.lastModified}`;
+
+      const isNew = !scannerImportedFilesRef.current.has(uniqueKey);
+      const isAfterMonitoringStart = latestFile.lastModified > scannerStartTimeRef.current - 5000;
+
+      if (autoImportScanner && isNew && isAfterMonitoringStart && !isLoading) {
+        playSuccessBeep();
+        await handleImportScannerFile(latestFile);
+      }
+    } catch (e) {
+      console.warn('Silent poll failed:', e);
+    }
+  };
+
+  // Toggle monitor callback
+  const handleToggleScannerMonitoring = () => {
+    if (isScannerMonitoring) {
+      setIsScannerMonitoring(false);
+      localStorage.setItem('keep_scanner_monitoring', 'false');
+    } else {
+      scannerStartTimeRef.current = Date.now();
+      setIsScannerMonitoring(true);
+      localStorage.setItem('keep_scanner_monitoring', 'true');
+      runScannerPollCheck(scannerDirHandle);
+    }
+  };
+
+  // Authorize callback
+  const handleAuthorizeScannerDir = async () => {
+    if (!scannerDirHandle) return;
+    try {
+      const options = { mode: 'read' as const };
+      const reqPerm = await scannerDirHandle.requestPermission(options);
+      setScannerPermission(reqPerm);
+      if (reqPerm === 'granted') {
+        const keepMonitoring = localStorage.getItem('keep_scanner_monitoring') === 'true';
+        if (keepMonitoring) {
+          scannerStartTimeRef.current = Date.now();
+          setIsScannerMonitoring(true);
+        }
+        await readScannerDirectory(scannerDirHandle);
+      }
+    } catch (err) {
+      console.error('Erro ao reautorizar pasta:', err);
+    }
+  };
+
+  // Disconnect callback
+  const handleDisconnectScanner = async () => {
+    setScannerDirHandle(null);
+    setIsScannerMonitoring(false);
+    setScannerPermission(null);
+    setScannerFiles([]);
+    localStorage.removeItem('keep_scanner_monitoring');
+    await clearScannerHandle();
+  };
+
+  // Initialize from storage on mount
+  useEffect(() => {
+    const initScanner = async () => {
+      const savedHandle = await getScannerHandle();
+      if (savedHandle) {
+        setScannerDirHandle(savedHandle);
+        try {
+          const perm = await savedHandle.queryPermission({ mode: 'read' });
+          setScannerPermission(perm);
+          
+          if (perm === 'granted') {
+            const files = await readScannerDirectory(savedHandle, true);
+            const preExisting = new Set<string>();
+            files.forEach(f => preExisting.add(`${f.name}-${f.lastModified}`));
+            scannerImportedFilesRef.current = preExisting;
+
+            const keepMonitoring = localStorage.getItem('keep_scanner_monitoring') === 'true';
+            if (keepMonitoring) {
+              scannerStartTimeRef.current = Date.now();
+              setIsScannerMonitoring(true);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to query initial permission for stored scanner:', e);
+        }
+      }
+    };
+    initScanner();
+  }, []);
+
+  // Set up continuous background polling interval
+  useEffect(() => {
+    if (isScannerMonitoring && scannerDirHandle) {
+      scannerIntervalRef.current = setInterval(() => {
+        runScannerPollCheck(scannerDirHandle);
+      }, 3000);
+    } else {
+      if (scannerIntervalRef.current) clearInterval(scannerIntervalRef.current);
+    }
+    return () => {
+      if (scannerIntervalRef.current) clearInterval(scannerIntervalRef.current);
+    };
+  }, [isScannerMonitoring, scannerDirHandle, autoImportScanner, isLoading]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -325,19 +526,6 @@ export default function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('autoPrint', autoPrint ? 'true' : 'false');
-  }, [autoPrint]);
-
-  useEffect(() => {
-    if (currentStep === AppStep.RESULT && autoPrint) {
-      const timer = setTimeout(() => {
-        window.print();
-      }, 1000); // 1s buffer for layout stability before print dialogue
-      return () => clearTimeout(timer);
-    }
-  }, [currentStep, autoPrint]);
 
   // Initialize data if null to prevent crashes in Setup
   if (!structuredData && currentStep === AppStep.SETUP) {
@@ -692,80 +880,6 @@ export default function App() {
     }
   };
 
-  const handleExportPdf = async () => {
-    if (!structuredData) return;
-    setIsExportingPdf(true);
-    setError(null);
-    try {
-      const element = document.querySelector('.preview-document-container');
-      if (!element) {
-        throw new Error('Elemento de visualização do parecer não encontrado.');
-      }
-
-      // Clone original element so web styles like boxShadow, scroll heights don't interfere
-      const clone = element.cloneNode(true) as HTMLElement;
-      clone.style.boxShadow = 'none';
-      clone.style.borderRadius = '0';
-      clone.style.border = 'none';
-      clone.style.margin = '0';
-      
-      // Remove gaps and shadow constraints on clone for a seamless 1:1 scale export
-      const printDoc = clone.querySelector('.print-document') as HTMLElement;
-      if (printDoc) {
-        printDoc.style.gap = '0';
-        printDoc.style.display = 'block';
-      }
-      
-      const pages = clone.querySelectorAll('.print-page');
-      pages.forEach((page) => {
-        (page as HTMLElement).style.boxShadow = 'none';
-        (page as HTMLElement).style.margin = '0';
-      });
-      
-      const credorText = (structuredData.credor || 'Final').trim();
-      const secretariaText = cleanSecretariaForFilename(structuredData.secretaria || '');
-      const nfText = (structuredData.num_nota_fiscal || '000').trim();
-      const valorText = (structuredData.valor || '0,00').trim();
-      
-      const secPart = secretariaText ? ` - ${secretariaText}` : '';
-      const fileName = `PARECER ${credorText}${secPart} - R$ ${valorText} - NF ${nfText}.pdf`
-        .replace(/[/\\?%*:|"<>]/g, '-');
-
-      const opt = {
-        margin:       0,
-        filename:     fileName,
-        image:        { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas:  { 
-          scale: 2, 
-          useCORS: true, 
-          letterRendering: true,
-          logging: false
-        },
-        jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-        pagebreak:    { mode: 'css' }
-      };
-
-      // Append clone to body off-screen to guarantee correct styling and font resolution
-      const container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.top = '-9999px';
-      container.appendChild(clone);
-      document.body.appendChild(container);
-
-      // Run html2pdf and download
-      await html2pdf().set(opt).from(clone).save();
-      
-      // Clean up DOM
-      document.body.removeChild(container);
-    } catch (err) {
-      console.error('Pdf export error:', err);
-      setError(`Falha ao exportar PDF: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsExportingPdf(false);
-    }
-  };
-
   const goToResult = () => {
     setCurrentStep(AppStep.RESULT);
     handleExport(); // Iniciar download automático ao gerar
@@ -919,7 +1033,27 @@ export default function App() {
                       </p>
                     </div>
 
-                    <ScannerFolderConfig onFileSelect={handleExtraction} isLoading={isLoading} />
+                    <ScannerFolderConfig 
+                      onFileSelect={handleExtraction} 
+                      isLoading={isLoading}
+                      dirHandle={scannerDirHandle}
+                      setDirHandle={setScannerDirHandle}
+                      isMonitoring={isScannerMonitoring}
+                      setIsMonitoring={setIsScannerMonitoring}
+                      scannedFiles={scannerFiles}
+                      setScannedFiles={setScannerFiles}
+                      isReading={isScannerReading}
+                      setIsReading={setIsScannerReading}
+                      autoImport={autoImportScanner}
+                      setAutoImport={setAutoImportScanner}
+                      scannerPermission={scannerPermission}
+                      setScannerPermission={setScannerPermission}
+                      readDirectoryFiles={readScannerDirectory}
+                      handleImportFile={handleImportScannerFile}
+                      toggleMonitoring={handleToggleScannerMonitoring}
+                      handleAuthorize={handleAuthorizeScannerDir}
+                      handleDisconnect={handleDisconnectScanner}
+                    />
 
                     {error && (
                       <motion.div
@@ -1025,31 +1159,9 @@ export default function App() {
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 1.02 }}
-                className="h-full grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 p-6 overflow-hidden max-w-[1400px] mx-auto w-full"
+                className="h-full max-w-xl mx-auto w-full p-6 flex flex-col gap-6 justify-center"
               >
-                {/* Left: Document Preview */}
-                <div className="bg-white rounded-[24px] border border-[#e2e8f0] shadow-2xl overflow-hidden flex flex-col">
-                  <div className="h-14 bg-[#f8fafc] border-b border-[#e2e8f0] px-6 flex items-center justify-between shrink-0">
-                    <span className="text-[11px] font-extrabold text-[#64748b] uppercase tracking-widest flex items-center gap-2">
-                      <Layout className="w-3.5 h-3.5" /> Pré-visualização do Documento
-                    </span>
-                    <button 
-                      onClick={goBackToSetup}
-                      className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1 uppercase"
-                    >
-                      ← Voltar para Edição
-                    </button>
-                  </div>
-                  <div className="flex-1 overflow-auto bg-slate-200/50 p-8 pt-12 custom-scrollbar">
-                    <div className="mx-auto transition-transform duration-500">
-                      <div className="preview-document-container">
-                        {structuredData && <ReportDocument structuredData={structuredData} />}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Actions */}
+                {/* Actions Panel */}
                 <div className="flex flex-col gap-6">
                   {error && (
                     <motion.div
@@ -1062,10 +1174,19 @@ export default function App() {
                     </motion.div>
                   )}
 
-                  <div className="bg-white rounded-[24px] border border-[#e2e8f0] p-8 shadow-lg">
-                    <h2 className="text-[13px] font-bold uppercase tracking-[0.15em] text-[#64748b] mb-6">
-                      Finalizar Documento
-                    </h2>
+                  <div className="bg-white rounded-[24px] border border-[#e2e8f0] p-8 shadow-xl">
+                    <div className="flex flex-col items-center justify-center text-center mb-8">
+                      <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner">
+                        📄
+                      </div>
+                      <h2 className="text-xl font-bold text-slate-800">
+                        Parecer Gerado com Sucesso!
+                      </h2>
+                      <p className="text-slate-500 text-xs mt-1.5 max-w-sm">
+                        O conteúdo foi formatado e está pronto para download.
+                      </p>
+                    </div>
+
                     <div className="flex flex-col gap-4">
                       <button
                         onClick={handleExport}
@@ -1080,81 +1201,6 @@ export default function App() {
                           <div className="text-[12px] opacity-70">Download automático iniciado</div>
                         </div>
                       </button>
-
-                      <button
-                        onClick={handleExportPdf}
-                        disabled={isExportingPdf}
-                        className="group w-full h-[80px] rounded-2xl bg-[#ef4444] text-white flex items-center px-6 gap-5 hover:bg-red-600 transition-all active:scale-95 shadow-xl shadow-red-100 disabled:opacity-50 cursor-pointer"
-                      >
-                        <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                          📕
-                        </div>
-                        <div className="text-left">
-                          <div className="font-bold text-lg">{isExportingPdf ? 'Gerando PDF...' : 'Baixar Parecer (PDF)'}</div>
-                          <div className="text-[12px] opacity-70">Fiel à formatação oficial (DOCX)</div>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => window.print()}
-                        className="group w-full h-[80px] rounded-2xl bg-emerald-600 text-white flex items-center px-6 gap-5 hover:bg-emerald-700 transition-all active:scale-95 shadow-xl shadow-emerald-100 cursor-pointer"
-                      >
-                        <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                          🖨️
-                        </div>
-                        <div className="text-left">
-                          <div className="font-bold text-lg">Imprimir Parecer</div>
-                          <div className="text-[12px] opacity-70">Nativo e em alta definição</div>
-                        </div>
-                      </button>
-                    </div>
-
-                    {/* Impressão Inteligente e Automática */}
-                    <div className="mt-6 pt-6 border-t border-[#f1f5f9] text-left">
-                      <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                        <div className="flex-1 pr-4">
-                          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-700 uppercase tracking-wider mb-0.5">
-                            <Sparkles className="w-4.5 h-4.5 text-emerald-500 animate-pulse" /> Auto-Impressão
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-snug">
-                            Se ativado, abrirá a tela do sistema para impressão física assim que gerar o parecer.
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => setAutoPrint(!autoPrint)}
-                          role="switch"
-                          aria-checked={autoPrint}
-                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            autoPrint ? 'bg-emerald-500' : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              autoPrint ? 'translate-x-5' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
-
-                      {/* Collapse explicativo de Impressão Física Silenciosa (Zero Cliques) */}
-                      <div className="mt-4 bg-blue-50/60 border border-blue-100/40 rounded-2xl p-4">
-                        <div className="flex gap-2.5">
-                          <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                          <div>
-                            <h4 className="text-xs font-bold text-blue-900 mb-1">Como ter Impressão Silenciosa (Zero Cliques)?</h4>
-                            <p className="text-[10px] text-blue-800 leading-relaxed">
-                              Por limitações de segurança dos navegadores, a impressão direta requer confirmação preliminar. Porém, você pode ignorar essa etapa e fazer seu computador imprimir <strong>instantaneamente de forma física</strong>:
-                            </p>
-                            <ol className="list-decimal list-inside text-[9.5px] text-blue-800 mt-2 space-y-1 ml-1">
-                              <li>Feche o navegador completamente;</li>
-                              <li>Clique com o botão direito no atalho do seu Chrome (ou Edge) e vá em <strong>Propriedades</strong>;</li>
-                              <li>No campo <strong>Destino</strong>, adicione <code className="bg-white/75 px-1 py-0.5 rounded text-red-700 font-mono text-[9px]">--kiosk-printing</code> no final do texto (ex: <code className="bg-white/75 px-1 py-0.5 rounded text-slate-600 font-mono text-[8px]">...chrome.exe" --kiosk-printing</code>);</li>
-                              <li>Abra o navegador por esse atalho. Pronto! Ao clicar em gerar, o computador imprimirá fisicamente sem abrir nenhuma tela!</li>
-                            </ol>
-                          </div>
-                        </div>
-                      </div>
                     </div>
 
                     <div className="mt-8 pt-8 border-t border-[#f1f5f9]">
@@ -1162,13 +1208,13 @@ export default function App() {
                        <div className="grid grid-cols-2 gap-3">
                          <button 
                            onClick={goBackToSetup}
-                           className="h-12 rounded-xl bg-slate-50 border border-border-base text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
+                           className="h-12 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
                          >
                            Editar Dados
                          </button>
                          <button 
                            onClick={() => window.location.reload()}
-                           className="h-12 rounded-xl bg-slate-50 border border-border-base text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
+                           className="h-12 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
                          >
                            Novo Parecer
                          </button>
