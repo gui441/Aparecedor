@@ -359,7 +359,7 @@ async function createTemplate() {
 
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { line: 360 },
+            spacing: { before: 720, line: 360 },
             children: [
               new TextRun({ text: "ANDERSON PEREIRA GOMES", bold: true, font: "Times New Roman" }),
             ],

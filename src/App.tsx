@@ -889,6 +889,13 @@ export default function App() {
     setCurrentStep(AppStep.SETUP);
   };
 
+  const handleNewParecer = () => {
+    setExtractedText('');
+    setStructuredData(null);
+    setCurrentStep(AppStep.CHOICE);
+    setError(null);
+  };
+
   const startWithMode = (mode: 'image' | 'form') => {
     setSelectedMode(mode);
     setCurrentStep(AppStep.SETUP);
@@ -997,7 +1004,7 @@ export default function App() {
 
             {currentStep === AppStep.SETUP && (
               <motion.div
-                key="setup"
+                key={`setup-${selectedMode}-${!!extractedText}`}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
@@ -1213,7 +1220,7 @@ export default function App() {
                            Editar Dados
                          </button>
                          <button 
-                           onClick={() => window.location.reload()}
+                           onClick={handleNewParecer}
                            className="h-12 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
                          >
                            Novo Parecer
