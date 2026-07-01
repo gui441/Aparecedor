@@ -1004,7 +1004,7 @@ export default function App() {
 
             {currentStep === AppStep.SETUP && (
               <motion.div
-                key={`setup-${selectedMode}-${!!extractedText}`}
+                key="setup"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}

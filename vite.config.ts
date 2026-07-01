@@ -33,6 +33,7 @@ export default defineConfig(({mode}) => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,docx}'],
+          navigateFallbackDenylist: [/^\/api/],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
