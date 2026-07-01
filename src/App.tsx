@@ -277,7 +277,7 @@ const ReportPage2 = ({ structuredData }: { structuredData: any }) => (
     <div className="signature-block no-indent">
       <div className="name uppercase">ANDERSON PEREIRA GOMES</div>
       <div className="text-[10pt] font-bold uppercase">CONTROLADOR GERAL INTERINO DO MUNICÍPIO</div>
-      <div className="text-[10pt] font-bold">Portaria N.º 203/2025</div>
+      <div className="text-[10pt] font-bold uppercase">PORTARIA N.º 203/2025</div>
     </div>
   </>
 );

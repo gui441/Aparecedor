@@ -261,7 +261,7 @@ async function createTemplate() {
             "02. Solicitação de Pagamento;",
             "03. Cópia do Extrato do Contrato;",
             "04. Comprovante de Publicação;",
-            "05. Nota de Empenho n.º {num_empenho}",
+            "05. Nota de Empenho n.º {num_empenho};",
             "06. Nota de Liquidação n.º {num_liquidacao};",
             "07. Nota Fiscal n.º {num_nota_fiscal}, validada e atestada;",
             "08. Ordem de Fornecimento;",
@@ -375,7 +375,7 @@ async function createTemplate() {
             alignment: AlignmentType.CENTER,
             spacing: { line: 360 },
             children: [
-              new TextRun({ text: "Portaria N.º 203/2025", bold: true, font: "Times New Roman" }),
+              new TextRun({ text: "PORTARIA N.º 203/2025", bold: true, font: "Times New Roman" }),
             ],
           }),
         ],
