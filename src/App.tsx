@@ -1127,39 +1127,6 @@ export default function App() {
               </motion.div>
             )}
 
-            {currentStep === AppStep.LOADING && (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="h-full flex flex-col items-center justify-center p-10 text-center"
-              >
-                <div className="relative w-24 h-24 mb-6">
-                  <motion.div 
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
-                    className="absolute inset-0 border-4 border-blue-100 border-t-blue-600 rounded-full"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center text-3xl">
-                    📄
-                  </div>
-                </div>
-                <h2 className="text-2xl font-bold text-[#1e293b] mb-2">Processando Documento</h2>
-                <p className="text-[#2563eb] font-bold text-sm mb-2 uppercase tracking-tight">
-                  {loadingMessage}
-                </p>
-                <p className="text-[#64748b] max-w-[300px] leading-relaxed">
-                  Lendo o conteúdo do documento para a sua tela de preenchimento...
-                </p>
-                <div className="mt-8 flex gap-2">
-                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-                </div>
-              </motion.div>
-            )}
-
             {currentStep === AppStep.RESULT && (
               <motion.div
                 key="result"
@@ -1245,6 +1212,30 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Render loading state as a clean, stable overlay on top of everything, completely bypassing Framer Motion exit/entry collisions */}
+          {currentStep === AppStep.LOADING && (
+            <div className="absolute inset-0 bg-slate-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-10 text-center animate-fade-in">
+              <div className="relative w-24 h-24 mb-6">
+                <div className="absolute inset-0 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center text-3xl">
+                  📄
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-[#1e293b] mb-2">Processando Documento</h2>
+              <p className="text-[#2563eb] font-bold text-sm mb-2 uppercase tracking-tight">
+                {loadingMessage}
+              </p>
+              <p className="text-[#64748b] max-w-[300px] leading-relaxed">
+                Lendo o conteúdo do documento para a sua tela de preenchimento...
+              </p>
+              <div className="mt-8 flex gap-2">
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+              </div>
+            </div>
+          )}
         </main>
       </div>
       </div>
