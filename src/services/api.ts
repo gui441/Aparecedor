@@ -10,12 +10,13 @@ export interface ExtractionResult {
   structured?: any;
 }
 
-function compressImageIfNeeded(file: File, maxDimension = 1800, quality = 0.85): Promise<File> {
+function preprocessImageForOcr(file: File, maxDimension = 1800, quality = 0.85): Promise<File> {
   if (!file.type.startsWith('image/')) {
     return Promise.resolve(file);
   }
 
   return new Promise((resolve) => {
+    const start = performance.now();
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -23,12 +24,7 @@ function compressImageIfNeeded(file: File, maxDimension = 1800, quality = 0.85):
         let width = img.width;
         let height = img.height;
 
-        // Se a imagem já for leve e menor que a dimensão máxima, envia original
-        if (width <= maxDimension && height <= maxDimension && file.size < 500 * 1024) {
-          resolve(file);
-          return;
-        }
-
+        // Se for menor que a dimensão máxima e já for leve, redimensiona apenas se necessário para manter DPI alto e boa velocidade
         if (width > height) {
           if (width > maxDimension) {
             height = Math.round((height * maxDimension) / width);
@@ -52,18 +48,119 @@ function compressImageIfNeeded(file: File, maxDimension = 1800, quality = 0.85):
         }
 
         ctx.drawImage(img, 0, 0, width, height);
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+
+        // 1. Converter para escala de cinza de alta fidelidade usando a fórmula de luminância BT.601
+        const grayscale = new Uint8Array(width * height);
+        for (let i = 0; i < data.length; i += 4) {
+          grayscale[i >> 2] = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+        }
+
+        // 2. Aplicar filtro de nitidez por convolução (Unsharp Mask) para destacar as arestas das letras
+        const sharpened = new Uint8Array(width * height);
+        const kernel = [
+           0, -1,  0,
+          -1,  5, -1,
+           0, -1,  0
+        ];
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            if (y === 0 || y === height - 1 || x === 0 || x === width - 1) {
+              sharpened[y * width + x] = grayscale[y * width + x];
+              continue;
+            }
+            
+            let sum = 0;
+            for (let ky = -1; ky <= 1; ky++) {
+              for (let kx = -1; kx <= 1; kx++) {
+                const val = grayscale[(y + ky) * width + (x + kx)];
+                const kVal = kernel[(ky + 1) * 3 + (kx + 1)];
+                sum += val * kVal;
+              }
+            }
+            sharpened[y * width + x] = Math.max(0, Math.min(255, sum));
+          }
+        }
+
+        // 3. Gerar Imagens Integrais (Summed Area Tables) em O(N) para média e média quadrática local
+        // Isso permite calcular o desvio padrão de janelas em tempo constante O(1) por pixel
+        const integral = new Float64Array((width + 1) * (height + 1));
+        const integralSq = new Float64Array((width + 1) * (height + 1));
+
+        for (let y = 0; y < height; y++) {
+          let rowSum = 0;
+          let rowSumSq = 0;
+          for (let x = 0; x < width; x++) {
+            const val = sharpened[y * width + x];
+            rowSum += val;
+            rowSumSq += val * val;
+
+            const idx = (y + 1) * (width + 1) + (x + 1);
+            const prevRowIdx = y * (width + 1) + (x + 1);
+
+            integral[idx] = integral[prevRowIdx] + rowSum;
+            integralSq[idx] = integralSq[prevRowIdx] + rowSumSq;
+          }
+        }
+
+        // 4. Binarização Adaptativa Local usando o algoritmo Sauvola
+        // Perfeito para remover sombras, dobras de papel, brilhos de câmera e vinhetas
+        const windowSize = Math.max(15, Math.floor(width / 45) | 1); // Janela dinâmica dependendo da resolução
+        const halfWin = Math.floor(windowSize / 2);
+        const k = 0.15; // Sensibilidade de limiar (0.15 é excelente para texto preto sobre papel claro/cinza)
+        const R = 128;  // Faixa dinâmica do desvio padrão
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const y1 = Math.max(0, y - halfWin);
+            const y2 = Math.min(height - 1, y + halfWin);
+            const x1 = Math.max(0, x - halfWin);
+            const x2 = Math.min(width - 1, x + halfWin);
+
+            const count = (y2 - y1 + 1) * (x2 - x1 + 1);
+
+            const idx00 = y1 * (width + 1) + x1;
+            const idx01 = y1 * (width + 1) + (x2 + 1);
+            const idx10 = (y2 + 1) * (width + 1) + x1;
+            const idx11 = (y2 + 1) * (width + 1) + (x2 + 1);
+
+            const sum = integral[idx11] - integral[idx01] - integral[idx10] + integral[idx00];
+            const sumSq = integralSq[idx11] - integralSq[idx01] - integralSq[idx10] + integralSq[idx00];
+
+            const mean = sum / count;
+            const variance = (sumSq / count) - (mean * mean);
+            const stdDev = Math.sqrt(Math.max(0, variance));
+
+            const threshold = mean * (1 + k * (stdDev / R - 1));
+            const currentVal = sharpened[y * width + x];
+
+            // Saída binária perfeita: preto (0) ou branco (255)
+            const binarized = currentVal > threshold ? 255 : 0;
+
+            const pixelIdx = (y * width + x) * 4;
+            data[pixelIdx] = binarized;
+            data[pixelIdx + 1] = binarized;
+            data[pixelIdx + 2] = binarized;
+            data[pixelIdx + 3] = 255; // Opaco
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
 
         canvas.toBlob((blob) => {
           if (!blob) {
             resolve(file);
             return;
           }
-          const compressedFile = new File([blob], file.name, {
+          const preprocessedFile = new File([blob], file.name, {
             type: 'image/jpeg',
             lastModified: Date.now()
           });
-          console.log(`Imagem otimizada para OCR: de ${(file.size / 1024 / 1024).toFixed(2)}MB para ${(compressedFile.size / 1024).toFixed(0)}KB`);
-          resolve(compressedFile);
+          const end = performance.now();
+          console.log(`[Tesseract Ápice] Processamento Sauvola integral completo em ${(end - start).toFixed(1)}ms. Imagem original de ${(file.size / 1024 / 1024).toFixed(2)}MB reduzida para binarizada de ${(preprocessedFile.size / 1024).toFixed(0)}KB.`);
+          resolve(preprocessedFile);
         }, 'image/jpeg', quality);
       };
       img.onerror = () => resolve(file);
@@ -76,8 +173,8 @@ function compressImageIfNeeded(file: File, maxDimension = 1800, quality = 0.85):
 
 export const apiService = {
   async extractText(file: File, onProgress?: (message: string) => void): Promise<ExtractionResult> {
-    if (onProgress) onProgress('Otimizando tamanho da imagem para processamento ultra rápido...');
-    const optimizedFile = await compressImageIfNeeded(file);
+    if (onProgress) onProgress('Preparando imagem com algoritmo de binarização adaptativa Sauvola...');
+    const optimizedFile = await preprocessImageForOcr(file);
     
     // Para testar PURAMENTE com Tesseract.js (leitura/OCR com IA desativada temporariamente)
     const enableServerIA = true;
@@ -117,7 +214,7 @@ export const apiService = {
     // 2. Client-side compilation with clean, pristine Tesseract directly on the original high-quality file
     try {
       console.log('Iniciando OCR local com Tesseract.js diretamente no arquivo otimizado...');
-      if (onProgress) onProgress('Preparando motor de OCR local...');
+      if (onProgress) onProgress('Preparando motor de OCR local de alta precisão...');
 
       const worker = await createWorker('por', 1, {
         logger: m => {
@@ -137,14 +234,16 @@ export const apiService = {
       // - Page Segmentation Mode (PSM) 3 is automatic page layout parsing
       // - Declare a higher DPI (300) to optimize internal word segmentation and prevent console logs/warnings
       // - Blacklist common garbage character noise to optimize the output
+      // - preserve_interword_spaces keeps crucial spacing for tabular data match
       await worker.setParameters({
         tessedit_pageseg_mode: '3' as any,
         user_defined_dpi: '300',
         tessedit_char_blacklist: '`#%^*~|{}[]<>\\', // Blacklist annoying OCR artifact symbols
         tessedit_enable_dict_correction: '1' as any,
+        preserve_interword_spaces: '1' as any, // Mantém espaçamento fidedigno do layout
       });
 
-      if (onProgress) onProgress('Extraindo texto do documento digitalizado...');
+      if (onProgress) onProgress('Extraindo texto do documento binarizado...');
       const { data: { text: rawText } } = await worker.recognize(optimizedFile);
       console.log('Reconhecimento local concluído, tamanho do texto:', rawText?.length);
       

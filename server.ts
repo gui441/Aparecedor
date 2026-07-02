@@ -7,6 +7,9 @@ import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
 import { GoogleGenAI, Type } from "@google/genai";
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
