@@ -638,8 +638,19 @@ export default function App() {
         num_nota_fiscal: text.match(/(?:Nota fiscal mercadoria|Nota fiscal servico|NFS-[eE]|NF-[eE]\s*n[ºo°.]|NF\s*n[ºo°.]|NFS-e|NF-e|NF|N[ºo°.]|Nota)\s*[\s.:\-_]*\s*(\d+(?:\.\d+)*)/i)?.[1]?.replace(/\./g, '') || 
                          textNoSpaces.match(/NOTAFISCAL(?:MERCADORIA|SERVICO)?(\d+)/)?.[1] || '',
         
-        // Processo no histórico: suportando dots como "1.225/2025" ou "1234/2025"
-        num_processo: text.match(/(?:Processo Administrativo|Processo|Proc\.?\s*Adm\.?)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
+        // Processo no histórico: suportando espaços, pontos ruidosos (ex: 1.225 / 2025) e tipos de processo
+        num_processo: (() => {
+          const m1 = text.match(/(?:Processo Administrativo|Processo de Pagamento|Processo|Proc\.?\s*Adm\.?)\s*(?:n[ºo°.]|n|#|:)?\s*(\d+(?:\.\d+)*\s*[\/\-]\s*\d+)/i);
+          if (m1) return m1[1].replace(/\s+/g, '');
+
+          const m2 = text.match(/(?:Processo Administrativo|Processo de Pagamento|Processo|Proc\.?\s*Adm\.?)\s*(?:n[ºo°.]|n|#|:)\s*(\d+(?:\.\d+)*)/i);
+          if (m2) return m2[1];
+
+          const m3 = textNoSpaces.match(/(?:PROCESSOADMINISTRATIVO|PROCESSO|PROCADM)(?:N[ºO°.]|N|#|:)?(\d+(?:[\/\-]\d+)?)/i);
+          if (m3) return m3[1];
+
+          return '';
+        })(),
         
         // Empenho: "NOTA DE EMPENHO... 09030010"
         num_empenho: text.match(/(?:NOTA\s*DE\s*EMPENHO|Empenho|NE)\s*[\s.:\-_]*\s*(\d+)/i)?.[1] || 
@@ -649,11 +660,47 @@ export default function App() {
         num_liquidacao: text.match(/(?:NOTA\s*DE\s*LIQUIDA[CÇ]ÃO|NOTA\s*DE\s*LIQUIDACAO|Liquidação|Liquidacao|NL)\s*[\s.:\-_]*\s*(\d+)/i)?.[1] || 
                         textNoSpaces.match(/LIQUIDA[CÇ][A-Z~^]*O[.\:]*(\d+)/)?.[1] || '',
         
-        // Contrato no histórico: "Contrato nº 446/2025"
-        num_contrato: text.match(/(?:Contrato)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
+        // Contrato no histórico com suporte a palavras intermediárias (Ex: Contrato de Prestação de Serviços nº 446/2025) e sem ano
+        num_contrato: (() => {
+          const isLaw = (val: string) => {
+            const clean = val.replace(/\D/g, '');
+            return clean === '866693' || clean === '1413321' || clean === '141332021';
+          };
+
+          const m1 = text.match(/(?:Contrato|CONTRATO)\s*(?:n[ºo°.]|n|#|:|º|°)?\s*(\d+(?:\.\d+)*\s*[\/\-]\s*\d+)/i);
+          if (m1 && !isLaw(m1[1])) return m1[1].replace(/\s+/g, '');
+
+          const m2 = text.match(/(?:Contrato|CONTRATO)(?:\s+[a-zA-ZÀ-ÿ]+){1,5}\s*(?:n[ºo°.]|n|#|:|º|°)?\s*(\d+(?:\.\d+)*\s*[\/\-]\s*\d+)/i);
+          if (m2 && !isLaw(m2[1])) return m2[1].replace(/\s+/g, '');
+
+          const m3 = text.match(/(?:Contrato|CONTRATO)\s*(?:n[ºo°.]|n|#|:|º|°)\s*(\d+)/i);
+          if (m3 && !isLaw(m3[1])) return m3[1];
+
+          const m4 = text.match(/(?:Contrato|CONTRATO)(?:\s+[a-zA-ZÀ-ÿ]+){1,5}\s*(?:n[ºo°.]|n|#|:|º|°)\s*(\d+)/i);
+          if (m4 && !isLaw(m4[1])) return m4[1];
+
+          const m5 = textNoSpaces.match(/CONTRATO(?:N[ºO°.]|N|#|:)?(\d+[\/\-]\d+)/i);
+          if (m5 && !isLaw(m5[1])) return m5[1];
+
+          const m6 = textNoSpaces.match(/CONTRATO(?:N[ºO°.]|N|#|:)?(\d+)/i);
+          if (m6 && !isLaw(m6[1])) return m6[1];
+
+          return '';
+        })(),
         
-        // Pregão no histórico: "Pregão Eletrônico n° 53/2025" ou "PE nº 53/2025"
-        num_pregao: text.match(/(?:PE|Pregão|Pregao)(?:\s+Eletr[ôo]nico)?\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
+        // Pregão / PE / Dispensa / Inexigibilidade no histórico com suporte a variações
+        num_pregao: (() => {
+          const m1 = text.match(/(?:P\.?\s*E\.?|Pregão|Pregao|Dispensa|Inexigibilidade|Concorrência|Concorrencia)(?:\s+[a-zA-ZÀ-ÿ]+){0,3}\s*(?:n[ºo°.]|n|#|:|º|°)?\s*(\d+(?:\.\d+)*\s*[\/\-]\s*\d+)/i);
+          if (m1) return m1[1].replace(/\s+/g, '');
+
+          const m2 = text.match(/(?:P\.?\s*E\.?|Pregão|Pregao|Dispensa|Inexigibilidade|Concorrência|Concorrencia)(?:\s+[a-zA-ZÀ-ÿ]+){0,3}\s*(?:n[ºo°.]|n|#|:|º|°)\s*(\d+)/i);
+          if (m2) return m2[1];
+
+          const m3 = textNoSpaces.match(/(?:PE|PREGAO|DISPENSA|INEXIGIBILIDADE|CONCORRENCIA)(?:N[ºO°.]|N|#|:)?(\d+(?:[\/\-]\d+)?)/i);
+          if (m3) return m3[1];
+
+          return '';
+        })(),
 
         // Detect modality/tipo_pregao
         tipo_pregao: (() => {
@@ -745,12 +792,12 @@ export default function App() {
         5. Preservação Factual: Em hipótese alguma altere valores financeiros reais nem invente fatos novos.
 
         Campos Necessários:
-        - num_processo: Geralmente no histórico ou próximo a "Processo Administrativo".
+        - num_processo: Número do Processo Administrativo ou de Pagamento (ex: "1.225/2025" ou "1305/2025"). Procure em todo o documento, especialmente na seção "HISTÓRICO", onde consta frequentemente como "Processo Administrativo nº X", "Processo de Pagamento n° X" ou "Processo n° X". Extraia o número completo, com barras ou pontos se presentes.
         - num_nota_fiscal: Número da NF ou NF-e.
         - secretaria: O nome específico da secretaria (ex: "Saúde", "Educação", "Planejamento, Orçamento e Gestão", "Assistência Social"). Sem prefixos "Secretaria Municipal de".
-        - num_contrato: Número do contrato no histórico.
+        - num_contrato: Número do contrato. Procure exaustivamente em todo o documento, especialmente no "HISTÓRICO" ou cabeçalhos. Pode constar como "Contrato nº X/X", "Contrato Administrativo nº X", "Contrato de Rateio nº X", "Contrato de Prestação de Serviços nº X", ou "CONTRATO: X". Extraia o número completo com barras ou hífens.
         - tipo_pregao: O tipo/modalidade do procedimento ou licitação (ex: 'Pregão Eletrônico', 'Inexigibilidade', 'Pregão Presencial', 'Concorrência Pública', 'Dispensa', 'Concorrência Eletrônica'). Caso seja mencionado 'Pregão Eletrônico' ou se refira a um pregão eletrônico, defina como 'Pregão Eletrônico'.
-        - num_pregao: Número do Pregão (PE) no histórico.
+        - num_pregao: Número do Pregão (PE) ou similar (PE, Dispensa, Inexigibilidade, etc.). Procure exaustivamente no "HISTÓRICO" ou cabeçalhos. Extraia o número completo correspondente (ex: "70/2024" ou "53/2025").
         - num_aditivo: Número do Termo Aditivo, caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
         - num_apostilamento: Número do Termo de Apostilamento, caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
         - num_adesao: Número da Adesão (ex: Adesão de SRP nº X), caso esteja mencionada no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
