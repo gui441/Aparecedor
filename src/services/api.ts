@@ -10,7 +10,70 @@ export interface ExtractionResult {
   structured?: any;
 }
 
-function preprocessImageForOcr(file: File, maxDimension = 1800, quality = 0.85): Promise<File> {
+function compressImageFast(file: File, maxDimension = 1600, quality = 0.85): Promise<File> {
+  if (!file.type.startsWith('image/')) {
+    return Promise.resolve(file);
+  }
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        // Se a imagem já for leve e menor que a dimensão máxima, envia original
+        if (width <= maxDimension && height <= maxDimension && file.size < 400 * 1024) {
+          resolve(file);
+          return;
+        }
+
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const compressedFile = new File([blob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+          });
+          resolve(compressedFile);
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
+function preprocessImageWithWorker(file: File, maxDimension = 1600, quality = 0.85): Promise<File> {
   if (!file.type.startsWith('image/')) {
     return Promise.resolve(file);
   }
@@ -24,7 +87,6 @@ function preprocessImageForOcr(file: File, maxDimension = 1800, quality = 0.85):
         let width = img.width;
         let height = img.height;
 
-        // Se for menor que a dimensão máxima e já for leve, redimensiona apenas se necessário para manter DPI alto e boa velocidade
         if (width > height) {
           if (width > maxDimension) {
             height = Math.round((height * maxDimension) / width);
@@ -49,119 +111,147 @@ function preprocessImageForOcr(file: File, maxDimension = 1800, quality = 0.85):
 
         ctx.drawImage(img, 0, 0, width, height);
         const imageData = ctx.getImageData(0, 0, width, height);
-        const data = imageData.data;
 
-        // 1. Converter para escala de cinza de alta fidelidade usando a fórmula de luminância BT.601
-        const grayscale = new Uint8Array(width * height);
-        for (let i = 0; i < data.length; i += 4) {
-          grayscale[i >> 2] = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        }
+        // Criar o código do worker inline para rodar o processamento pesado Sauvola
+        // em outra thread do processador, garantindo 100% de fluidez na UI principal!
+        const workerCode = `
+          self.onmessage = function(e) {
+            const { imageData, width, height } = e.data;
+            const data = imageData.data;
 
-        // 2. Aplicar filtro de nitidez por convolução (Unsharp Mask) para destacar as arestas das letras
-        const sharpened = new Uint8Array(width * height);
-        const kernel = [
-           0, -1,  0,
-          -1,  5, -1,
-           0, -1,  0
-        ];
-
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            if (y === 0 || y === height - 1 || x === 0 || x === width - 1) {
-              sharpened[y * width + x] = grayscale[y * width + x];
-              continue;
+            // 1. Converter para escala de cinza (luminância BT.601)
+            const grayscale = new Uint8Array(width * height);
+            for (let i = 0; i < data.length; i += 4) {
+              grayscale[i >> 2] = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
             }
-            
-            let sum = 0;
-            for (let ky = -1; ky <= 1; ky++) {
-              for (let kx = -1; kx <= 1; kx++) {
-                const val = grayscale[(y + ky) * width + (x + kx)];
-                const kVal = kernel[(ky + 1) * 3 + (kx + 1)];
-                sum += val * kVal;
+
+            // 2. Filtro de nitidez (Unsharp Mask)
+            const sharpened = new Uint8Array(width * height);
+            const kernel = [
+               0, -1,  0,
+              -1,  5, -1,
+               0, -1,  0
+            ];
+
+            for (let y = 0; y < height; y++) {
+              for (let x = 0; x < width; x++) {
+                if (y === 0 || y === height - 1 || x === 0 || x === width - 1) {
+                  sharpened[y * width + x] = grayscale[y * width + x];
+                  continue;
+                }
+                
+                let sum = 0;
+                for (let ky = -1; ky <= 1; ky++) {
+                  for (let kx = -1; kx <= 1; kx++) {
+                    const val = grayscale[(y + ky) * width + (x + kx)];
+                    const kVal = kernel[(ky + 1) * 3 + (kx + 1)];
+                    sum += val * kVal;
+                  }
+                }
+                sharpened[y * width + x] = Math.max(0, Math.min(255, sum));
               }
             }
-            sharpened[y * width + x] = Math.max(0, Math.min(255, sum));
-          }
-        }
 
-        // 3. Gerar Imagens Integrais (Summed Area Tables) em O(N) para média e média quadrática local
-        // Isso permite calcular o desvio padrão de janelas em tempo constante O(1) por pixel
-        const integral = new Float64Array((width + 1) * (height + 1));
-        const integralSq = new Float64Array((width + 1) * (height + 1));
+            // 3. Imagens Integrais em O(N)
+            const integral = new Float64Array((width + 1) * (height + 1));
+            const integralSq = new Float64Array((width + 1) * (height + 1));
 
-        for (let y = 0; y < height; y++) {
-          let rowSum = 0;
-          let rowSumSq = 0;
-          for (let x = 0; x < width; x++) {
-            const val = sharpened[y * width + x];
-            rowSum += val;
-            rowSumSq += val * val;
+            for (let y = 0; y < height; y++) {
+              let rowSum = 0;
+              let rowSumSq = 0;
+              for (let x = 0; x < width; x++) {
+                const val = sharpened[y * width + x];
+                rowSum += val;
+                rowSumSq += val * val;
 
-            const idx = (y + 1) * (width + 1) + (x + 1);
-            const prevRowIdx = y * (width + 1) + (x + 1);
+                const idx = (y + 1) * (width + 1) + (x + 1);
+                const prevRowIdx = y * (width + 1) + (x + 1);
 
-            integral[idx] = integral[prevRowIdx] + rowSum;
-            integralSq[idx] = integralSq[prevRowIdx] + rowSumSq;
-          }
-        }
+                integral[idx] = integral[prevRowIdx] + rowSum;
+                integralSq[idx] = integralSq[prevRowIdx] + rowSumSq;
+              }
+            }
 
-        // 4. Binarização Adaptativa Local usando o algoritmo Sauvola
-        // Perfeito para remover sombras, dobras de papel, brilhos de câmera e vinhetas
-        const windowSize = Math.max(15, Math.floor(width / 45) | 1); // Janela dinâmica dependendo da resolução
-        const halfWin = Math.floor(windowSize / 2);
-        const k = 0.15; // Sensibilidade de limiar (0.15 é excelente para texto preto sobre papel claro/cinza)
-        const R = 128;  // Faixa dinâmica do desvio padrão
+            // 4. Binarização Sauvola de Alta Performance
+            const windowSize = Math.max(15, Math.floor(width / 45) | 1);
+            const halfWin = Math.floor(windowSize / 2);
+            const k = 0.15;
+            const R = 128;
 
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const y1 = Math.max(0, y - halfWin);
-            const y2 = Math.min(height - 1, y + halfWin);
-            const x1 = Math.max(0, x - halfWin);
-            const x2 = Math.min(width - 1, x + halfWin);
+            for (let y = 0; y < height; y++) {
+              for (let x = 0; x < width; x++) {
+                const y1 = Math.max(0, y - halfWin);
+                const y2 = Math.min(height - 1, y + halfWin);
+                const x1 = Math.max(0, x - halfWin);
+                const x2 = Math.min(width - 1, x + halfWin);
 
-            const count = (y2 - y1 + 1) * (x2 - x1 + 1);
+                const count = (y2 - y1 + 1) * (x2 - x1 + 1);
 
-            const idx00 = y1 * (width + 1) + x1;
-            const idx01 = y1 * (width + 1) + (x2 + 1);
-            const idx10 = (y2 + 1) * (width + 1) + x1;
-            const idx11 = (y2 + 1) * (width + 1) + (x2 + 1);
+                const idx00 = y1 * (width + 1) + x1;
+                const idx01 = y1 * (width + 1) + (x2 + 1);
+                const idx10 = (y2 + 1) * (width + 1) + x1;
+                const idx11 = (y2 + 1) * (width + 1) + (x2 + 1);
 
-            const sum = integral[idx11] - integral[idx01] - integral[idx10] + integral[idx00];
-            const sumSq = integralSq[idx11] - integralSq[idx01] - integralSq[idx10] + integralSq[idx00];
+                const sum = integral[idx11] - integral[idx01] - integral[idx10] + integral[idx00];
+                const sumSq = integralSq[idx11] - integralSq[idx01] - integralSq[idx10] + integralSq[idx00];
 
-            const mean = sum / count;
-            const variance = (sumSq / count) - (mean * mean);
-            const stdDev = Math.sqrt(Math.max(0, variance));
+                const mean = sum / count;
+                const variance = (sumSq / count) - (mean * mean);
+                const stdDev = Math.sqrt(Math.max(0, variance));
 
-            const threshold = mean * (1 + k * (stdDev / R - 1));
-            const currentVal = sharpened[y * width + x];
+                const threshold = mean * (1 + k * (stdDev / R - 1));
+                const currentVal = sharpened[y * width + x];
 
-            // Saída binária perfeita: preto (0) ou branco (255)
-            const binarized = currentVal > threshold ? 255 : 0;
+                const binarized = currentVal > threshold ? 255 : 0;
 
-            const pixelIdx = (y * width + x) * 4;
-            data[pixelIdx] = binarized;
-            data[pixelIdx + 1] = binarized;
-            data[pixelIdx + 2] = binarized;
-            data[pixelIdx + 3] = 255; // Opaco
-          }
-        }
+                const pixelIdx = (y * width + x) * 4;
+                data[pixelIdx] = binarized;
+                data[pixelIdx + 1] = binarized;
+                data[pixelIdx + 2] = binarized;
+                data[pixelIdx + 3] = 255;
+              }
+            }
 
-        ctx.putImageData(imageData, 0, 0);
+            self.postMessage({ imageData });
+          };
+        `;
 
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            resolve(file);
-            return;
-          }
-          const preprocessedFile = new File([blob], file.name, {
-            type: 'image/jpeg',
-            lastModified: Date.now()
-          });
-          const end = performance.now();
-          console.log(`[Tesseract Ápice] Processamento Sauvola integral completo em ${(end - start).toFixed(1)}ms. Imagem original de ${(file.size / 1024 / 1024).toFixed(2)}MB reduzida para binarizada de ${(preprocessedFile.size / 1024).toFixed(0)}KB.`);
-          resolve(preprocessedFile);
-        }, 'image/jpeg', quality);
+        const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+        const workerUrl = URL.createObjectURL(workerBlob);
+        const worker = new Worker(workerUrl);
+
+        worker.onmessage = (event) => {
+          const resImageData = event.data.imageData;
+          ctx.putImageData(resImageData, 0, 0);
+
+          canvas.toBlob((outBlob) => {
+            worker.terminate();
+            URL.revokeObjectURL(workerUrl);
+
+            if (!outBlob) {
+              resolve(file);
+              return;
+            }
+
+            const preprocessedFile = new File([outBlob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            const end = performance.now();
+            console.log(`[Tesseract Ápice] Processamento Sauvola via Web Worker completo em ${(end - start).toFixed(1)}ms. Interface 100% fluida.`);
+            resolve(preprocessedFile);
+          }, 'image/jpeg', quality);
+        };
+
+        worker.onerror = (err) => {
+          console.error("Worker error, fallback to non-processed file:", err);
+          worker.terminate();
+          URL.revokeObjectURL(workerUrl);
+          resolve(file);
+        };
+
+        // Enviar os dados de imagem para o worker
+        worker.postMessage({ imageData, width, height });
       };
       img.onerror = () => resolve(file);
       img.src = e.target?.result as string;
@@ -173,14 +263,15 @@ function preprocessImageForOcr(file: File, maxDimension = 1800, quality = 0.85):
 
 export const apiService = {
   async extractText(file: File, onProgress?: (message: string) => void): Promise<ExtractionResult> {
-    if (onProgress) onProgress('Preparando imagem com algoritmo de binarização adaptativa Sauvola...');
-    const optimizedFile = await preprocessImageForOcr(file);
-    
-    // Para testar PURAMENTE com Tesseract.js (leitura/OCR com IA desativada temporariamente)
     const enableServerIA = true;
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
+    // Se estiver online, otimizar com compressor rápido para enviar imagem colorida de alta definição ao Gemini.
+    // Isso é extremamente rápido (<50ms), evita qualquer lag e preserva detalhes e cores para melhor precisão da IA.
     if (enableServerIA && isOnline) {
+      if (onProgress) onProgress('Otimizando imagem para processamento rápido...');
+      const optimizedFile = await compressImageFast(file);
+
       try {
         console.log('Iniciando OCR de alta fidelidade pelo servidor para o arquivo:', optimizedFile.name);
         if (onProgress) onProgress('Processando imagem com IA de alta fidelidade...');
@@ -210,6 +301,12 @@ export const apiService = {
     } else {
       console.log('Utilizando OCR local imediato com Tesseract.js (IA desativada).');
     }
+
+    // FALLBACK LOCAL: Se a IA falhar ou o cliente estiver offline, rodamos o Tesseract localmente.
+    // Para que o Tesseract tenha a melhor acurácia (seu "ápice"), aplicamos a binarização adaptativa Sauvola.
+    // Executamos em um Web Worker para garantir lag ZERO na interface!
+    if (onProgress) onProgress('Preparando binarização adaptativa Sauvola em segundo plano...');
+    const binarizedFile = await preprocessImageWithWorker(file);
 
     // 2. Client-side compilation with clean, pristine Tesseract directly on the original high-quality file
     try {
@@ -244,7 +341,7 @@ export const apiService = {
       });
 
       if (onProgress) onProgress('Extraindo texto do documento binarizado...');
-      const { data: { text: rawText } } = await worker.recognize(optimizedFile);
+      const { data: { text: rawText } } = await worker.recognize(binarizedFile);
       console.log('Reconhecimento local concluído, tamanho do texto:', rawText?.length);
       
       await worker.terminate();
@@ -332,6 +429,7 @@ export const apiService = {
       if (structured.num_aditivo) aditivosParts.push(`Termo Aditivo n.º ${structured.num_aditivo}`);
       if (structured.num_apostilamento) aditivosParts.push(`Termo de Apostilamento n.º ${structured.num_apostilamento}`);
       if (structured.num_adesao) aditivosParts.push(`Adesão n.º ${structured.num_adesao}`);
+      if (structured.num_registro_preco) aditivosParts.push(`Registro de Preço n.º ${structured.num_registro_preco}`);
       
       const aditivosLine = aditivosParts.join(' – ');
       const hasAditivosLine = aditivosParts.length > 0;

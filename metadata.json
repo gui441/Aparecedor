@@ -1,5 +1,5 @@
 {
-  "name": "APARECEDOR",
+  "name": "DESPACHADOR",
   "description": "Aplicativo para extração automática de dados de imagens usando OCR, permitindo edição e exportação para Word.",
   "requestFramePermissions": [],
   "majorCapabilities": [

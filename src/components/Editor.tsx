@@ -14,6 +14,22 @@ export const PROCUREMENT_MODALITIES = [
   'Chamamento Público'
 ];
 
+export const SECRETARIES = [
+  'Saúde',
+  'Educação',
+  'Assistência Social',
+  'Planejamento, Orçamento e Gestão',
+  'Infraestrutura',
+  'Cultura',
+  'Esportes',
+  'Juventude e Tecnologia',
+  'da Mulher',
+  'Indústria, Comércio e Turismo',
+  'Gabinete do Prefeito',
+  'Meio Ambiente e Urbanismo',
+  'Agricultura, Aquicultura e Pesca'
+];
+
 interface EditorProps {
   content: string;
   structured: any;
@@ -164,7 +180,7 @@ export const Editor: React.FC<EditorProps> = ({
       {!compactView && (
         <div className="flex items-center justify-between">
           <h2 className="text-[13px] font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
-            Editor de Parecer
+            Editor de Despacho
           </h2>
         </div>
       )}
@@ -258,11 +274,12 @@ export const Editor: React.FC<EditorProps> = ({
               </div>
             )}
 
-            {/* Optional fields: Termo Aditivo, Termo de Apostilamento, Adesão */}
-            <div className="col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 border border-slate-200/60 p-4 rounded-2xl">
+            {/* Optional fields: Termo Aditivo, Termo de Apostilamento, Adesão, Registro de Preço */}
+            <div className="col-span-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-50 border border-slate-200/60 p-4 rounded-2xl">
               <InputField label="Termo Aditivo" value={structured?.num_aditivo || ''} onChange={(val) => updateField('num_aditivo', val)} />
               <InputField label="Termo de Apostilamento" value={structured?.num_apostilamento || ''} onChange={(val) => updateField('num_apostilamento', val)} />
               <InputField label="Adesão" value={structured?.num_adesao || ''} onChange={(val) => updateField('num_adesao', val)} />
+              <InputField label="Registro de Preço" value={structured?.num_registro_preco || ''} onChange={(val) => updateField('num_registro_preco', val)} />
             </div>
 
             {/* Legislation Selector Toggles */}
@@ -313,7 +330,40 @@ export const Editor: React.FC<EditorProps> = ({
               </div>
             </div>
             
-            <InputField label="Secretaria" value={structured?.secretaria || ''} onChange={(val) => updateField('secretaria', val)} fullWidth />
+            {/* Dropdown for Secretaria */}
+            <div className="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              <div className="space-y-1">
+                <label className="text-[10.5px] font-extrabold text-[#64748b] uppercase tracking-wider block">Secretaria</label>
+                <select
+                  value={SECRETARIES.includes(structured?.secretaria || '') ? (structured?.secretaria || '') : (structured?.secretaria ? 'Outro' : '')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'Outro') {
+                      if (SECRETARIES.includes(structured?.secretaria || '')) {
+                        updateField('secretaria', '');
+                      }
+                    } else {
+                      updateField('secretaria', val);
+                    }
+                  }}
+                  className="w-full h-11 px-3 border border-[#e2e8f0] rounded-xl text-xs sm:text-sm bg-white focus:border-[#2563eb] focus:ring-2 focus:ring-blue-50 outline-none transition-all cursor-pointer font-sans"
+                >
+                  <option value="" disabled>Selecione uma Secretaria...</option>
+                  {SECRETARIES.map((sec) => (
+                    <option key={sec} value={sec}>{sec}</option>
+                  ))}
+                  <option value="Outro">Outro (Especificar...)</option>
+                </select>
+              </div>
+
+              {(!SECRETARIES.includes(structured?.secretaria || '') || !structured?.secretaria) && (
+                <InputField 
+                  label="Especifique a Secretaria" 
+                  value={structured?.secretaria || ''} 
+                  onChange={(val) => updateField('secretaria', val)} 
+                />
+              )}
+            </div>
             
             {/* Group 2: Valor e NF */}
             <InputField 

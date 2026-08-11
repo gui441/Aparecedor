@@ -7,9 +7,6 @@ import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
 import { GoogleGenAI, Type } from "@google/genai";
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
@@ -131,6 +128,7 @@ Sua tarefa é analisar a imagem fornecida (que é tipicamente uma "Nota de Liqui
 - num_aditivo: Número do Termo Aditivo. Verifique se consta como "Termo Aditivo n° 01/2025" ou similar. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
 - num_apostilamento: Número do Termo de Apostilamento, se houver mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
 - num_adesao: Número da Adesão (ex: Adesão de SRP nº X / Adesão nº X), se houver mencionada no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
+- num_registro_preco: Número do Registro de Preço / Ata de Registro de Preço (ex: Registro de Preço nº 05/2025 / SRP nº 05/2025), se houver mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
 - valor: O valor total ou valor liquidado do documento (formatado como "R$ X.XXX,XX"). ATENÇÃO CRÍTICA: Se houver campo "VALOR" no topo do empenho (ex: R$ 15.411,51) e campo "VALOR LIQUIDADO" no corpo/rodapé (ex: 8.785,35), você DEVE dar preferência absoluta e extrair o "VALOR LIQUIDADO" (ex: "R$ 8.785,35"), pois é este o valor efetivo de liquidação em auditoria para o parecer de pagamento.
 - credor: Razão Social ou Nome do Credor (a empresa contratada, ex: "NACIONAL PAX SERVIÇOS PÓSTUMOS LTDA"). Corrija erros de grafia, acentue palavras como "PÓSTUMOS" de forma correta se vier "POSTUMOS" e padronize "LTDA", "S/A", "ME" em maiúsculas profissionais.
 - cnpj: CNPJ do Credor (ex: "30.368.334/0001-83").
@@ -176,6 +174,7 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
                       num_aditivo: { type: Type.STRING },
                       num_apostilamento: { type: Type.STRING },
                       num_adesao: { type: Type.STRING },
+                      num_registro_preco: { type: Type.STRING },
                       valor: { type: Type.STRING },
                       credor: { type: Type.STRING },
                       cnpj: { type: Type.STRING },
@@ -199,6 +198,7 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
             if (structured.num_aditivo !== undefined) structured.num_aditivo = cleanOptionalField(structured.num_aditivo);
             if (structured.num_apostilamento !== undefined) structured.num_apostilamento = cleanOptionalField(structured.num_apostilamento);
             if (structured.num_adesao !== undefined) structured.num_adesao = cleanOptionalField(structured.num_adesao);
+            if (structured.num_registro_preco !== undefined) structured.num_registro_preco = cleanOptionalField(structured.num_registro_preco);
 
             return res.json({
               text: parsed.text || '',
@@ -268,6 +268,7 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
           if (structured.num_aditivo) aditivosParts.push(`Termo Aditivo n.º ${structured.num_aditivo}`);
           if (structured.num_apostilamento) aditivosParts.push(`Termo de Apostilamento n.º ${structured.num_apostilamento}`);
           if (structured.num_adesao) aditivosParts.push(`Adesão n.º ${structured.num_adesao}`);
+          if (structured.num_registro_preco) aditivosParts.push(`Registro de Preço n.º ${structured.num_registro_preco}`);
           
           const aditivosLine = aditivosParts.join(' – ');
           const hasAditivosLine = aditivosParts.length > 0;
@@ -277,7 +278,7 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
             ...structured,
             aditivos_line: aditivosLine,
             has_aditivos_line: hasAditivosLine,
-            title: title || 'PARECER DO CONTROLE INTERNO MUNICIPAL',
+            title: title || 'DESPACHO',
           });
         } catch (error) {
           console.error('Docxtemplater Render Error:', error);
@@ -286,7 +287,7 @@ Retorne obrigatoriamente um objeto JSON com as propriedades 'text' (a transcriç
 
         const buffer = doc.getZip().generate({ type: 'nodebuffer' });
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        res.setHeader('Content-Disposition', 'attachment; filename=parecer-final.docx');
+        res.setHeader('Content-Disposition', 'attachment; filename=despacho-final.docx');
         return res.send(buffer);
       }
 
@@ -325,7 +326,7 @@ Instruções específicas para correção:
 3. Objeto do Parecer/Contrato: Corrija a concordância, pontuação, exclua lixo de digitalização ou caracteres avulsos. Complete termos truncados e corrija erros como "forncimento" -> "fornecimento", "aditio" -> "aditivo", "prestacao" -> "prestação", "aquisicao" -> "aquisição", "manutencao" -> "manutenção". ATENÇÃO CRÍTICA: Você deve IGNORAR, OMITIR ou REMOVER inteiramente do texto do objeto qualquer menção à Secretaria atendida/destinatária (ex: de "fornecimento de bens e serviços fúnebres, para atender as necessidades da Secretaria de Assistência Social", deixe APENAS "fornecimento de bens e serviços fúnebres").
 4. Unidades e Números: Preserve integralmente quaisquer dígitos referentes a CPF, CNPJ, números de contratos, processos e empenhos. Conserte somente pontuações inadequadas neles, mantendo os dígitos exatos intactos.
 5. Preservação Factual: Em hipótese alguma invente informações novas ou altere valores financeiros, pois são dados de auditoria legalmente vinculantes.
-6. Campos opcionais (termo aditivo, termo de apostilamento e de adesão): Se estes campos vierem preenchidos no rascunho com expressões de ausência (como "N/A", "Não consta", "Não se aplica", "Não aplicável", "Sem", "NULL", etc.) ou sem números válidos, ou se não existirem no documento de origem, você DEVE limpá-los obrigatoriamente e deixá-los como string vazia ("").
+6. Campos opcionais (termo aditivo, termo de apostilamento, de adesão e registro de preço): Se estes campos vierem preenchidos no rascunho com expressões de ausência (como "N/A", "Não consta", "Não se aplica", "Não aplicável", "Sem", "NULL", etc.) ou sem números válidos, ou se não existirem no documento de origem, você DEVE limpá-los obrigatoriamente e deixá-los como string vazia ("").
 
 Abaixo estão os dados rascunhados em formato JSON:
 ${JSON.stringify(structured, null, 2)}
@@ -348,6 +349,7 @@ Retorne obrigatoriamente um objeto JSON com as mesmas propriedades revisadas.`;
               num_aditivo: { type: Type.STRING },
               num_apostilamento: { type: Type.STRING },
               num_adesao: { type: Type.STRING },
+              num_registro_preco: { type: Type.STRING },
               valor: { type: Type.STRING },
               credor: { type: Type.STRING },
               cnpj: { type: Type.STRING },
@@ -358,7 +360,7 @@ Retorne obrigatoriamente um objeto JSON com as mesmas propriedades revisadas.`;
               mes: { type: Type.STRING },
               ano: { type: Type.STRING }
             },
-            required: ["num_processo", "num_nota_fiscal", "secretaria", "num_contrato", "tipo_pregao", "num_pregao", "num_aditivo", "num_apostilamento", "num_adesao", "valor", "credor", "cnpj", "objeto", "num_empenho", "num_liquidacao", "dia", "mes", "ano"]
+            required: ["num_processo", "num_nota_fiscal", "secretaria", "num_contrato", "tipo_pregao", "num_pregao", "num_aditivo", "num_apostilamento", "num_adesao", "num_registro_preco", "valor", "credor", "cnpj", "objeto", "num_empenho", "num_liquidacao", "dia", "mes", "ano"]
           }
         }
       });
@@ -370,6 +372,7 @@ Retorne obrigatoriamente um objeto JSON com as mesmas propriedades revisadas.`;
           if (corrected.num_aditivo !== undefined) corrected.num_aditivo = cleanOptionalField(corrected.num_aditivo);
           if (corrected.num_apostilamento !== undefined) corrected.num_apostilamento = cleanOptionalField(corrected.num_apostilamento);
           if (corrected.num_adesao !== undefined) corrected.num_adesao = cleanOptionalField(corrected.num_adesao);
+          if (corrected.num_registro_preco !== undefined) corrected.num_registro_preco = cleanOptionalField(corrected.num_registro_preco);
         }
         return res.json({ corrected });
       }

@@ -185,99 +185,75 @@ export function cleanSecretariaForFilename(name: string): string {
 
 const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
   <>
-    <h1>PARECER DO CONTROLE INTERNO MUNICIPAL</h1>
+    <h1 className="text-center font-bold text-[11pt] uppercase mb-3 tracking-wide">DESPACHO</h1>
     
-    <div className="header-field">Assunto: Análise do Processo Administrativo n.º {structuredData.num_processo}</div>
-    <div className="header-field">Objeto: Pagamento da Nota Fiscal n.º {structuredData.num_nota_fiscal}, da Secretaria Municipal de {structuredData.secretaria} desta Municipalidade.</div>
-    <div className="header-field">Contrato n.º {structuredData.num_contrato} – {structuredData.tipo_pregao || 'Pregão Eletrônico'} n.º {structuredData.num_pregao}</div>
+    <div className="header-field font-bold">Credor: {structuredData.credor}</div>
+    <div className="header-field font-bold">CNPJ: {structuredData.cnpj}</div>
+    <div className="header-field font-bold">Assunto: Análise do Processo Administrativo n.º {structuredData.num_processo}</div>
+    <div className="header-field font-bold">
+      Objeto: Pagamento da Nota Fiscal n.º {structuredData.num_nota_fiscal}, da Secretaria {structuredData.secretaria ? (structuredData.secretaria.toLowerCase().startsWith('secretaria') ? structuredData.secretaria : `Municipal de ${structuredData.secretaria}`) : ''} desta Municipalidade.
+    </div>
+    <div className="header-field font-bold">Contrato n.º {structuredData.num_contrato} – {structuredData.tipo_pregao || 'Dispensa'} n.º {structuredData.num_pregao}</div>
     {(() => {
       const parts = [];
       if (structuredData.num_aditivo) parts.push(`Termo Aditivo n.º ${structuredData.num_aditivo}`);
       if (structuredData.num_apostilamento) parts.push(`Termo de Apostilamento n.º ${structuredData.num_apostilamento}`);
       if (structuredData.num_adesao) parts.push(`Adesão n.º ${structuredData.num_adesao}`);
+      if (structuredData.num_registro_preco) parts.push(`Registro de Preço n.º ${structuredData.num_registro_preco}`);
       if (parts.length === 0) return null;
-      return <div className="header-field">{parts.join(' – ')}</div>;
+      return <div className="header-field font-bold">{parts.join(' – ')}</div>;
     })()}
-    <div className="header-field mb-3">Valor: {structuredData.valor?.toString().startsWith('R$') ? structuredData.valor : `R$ ${structuredData.valor}`}{structuredData.valor_extenso ? ` (${structuredData.valor_extenso})` : ''}</div>
+    <div className="header-field font-bold mb-3">Valor: {structuredData.valor?.toString().startsWith('R$') ? structuredData.valor : `R$ ${structuredData.valor}`}{structuredData.valor_extenso ? ` (${structuredData.valor_extenso})` : ''}</div>
 
-    <p>
-      O Órgão de Controle Interno da Prefeitura Municipal de Barra do Corda – MA, atendendo o previsto nos Artigos 31 e 74 da Constituição Federal, Artigo 59 da Lei Complementar n.º 101, de 04 de maio de 2000, e demais normas que regulam as atribuições do Sistema de Controle Interno, referentes ao exercício de controle prévio e concomitante dos atos de gestão para análise quanto à legalidade e verificação das demais formalidades, no que tange ao Processo Administrativo, encaminhado pela Secretaria Municipal de {structuredData.secretaria}, referente à solicitação de pagamento das despesas constantes da Nota Fiscal n.º <b>{structuredData.num_nota_fiscal}</b>, em favor da empresa nacional <b>{structuredData.credor}</b>, <b>portadora do CNPJ</b> <b>{structuredData.cnpj}</b>.
-    </p>
-
-    <div className="section-title">I - RELATÓRIO</div>
+    <div className="section-title">I - DA ANÁLISE DOS DOCUMENTOS ANEXADOS</div>
     
-    <p>
-      Veio ao conhecimento desta Controladoria Geral do Município de Barra Do Corda/MA, o Processo de Pagamento referente a Nota Fiscal de n.º <b>{structuredData.num_nota_fiscal}</b>, que tem como credor a empresa <b>{structuredData.credor}</b>, <b>portadora do CNPJ</b> <b>{structuredData.cnpj}</b>, contrato que tem como objeto contratação de empresa para {structuredData.objeto}, para satisfazer as necessidades da Secretaria de {structuredData.secretaria} do município de Barra do Corda - MA, para análise quanto a legalidade e verificação das demais formalidades, a fim de executar o respectivo pagamento.
-    </p>
-
-    <div className="section-title">II - DA ANÁLISE DOS DOCUMENTOS ANEXADOS</div>
-    
-    <p className="mb-2 no-indent">
+    <p className="mb-2">
       Verifica-se nos autos os documentos que embasaram o presente processo de pagamento, conforme segue:
     </p>
     
-    <div className="document-list mb-4">
-      <div>01. Autorização de Pagamento;</div>
-      <div>02. Solicitação de Pagamento;</div>
-      <div>03. Cópia do Extrato do Contrato;</div>
-      <div>04. Comprovante de Publicação;</div>
-      <div>05. Nota de Empenho n.º {structuredData.num_empenho};</div>
-      <div>06. Nota de Liquidação n.º {structuredData.num_liquidacao};</div>
-      <div>07. Nota Fiscal n.º {structuredData.num_nota_fiscal}, validada e atestada;</div>
-      <div>08. Ordem de Fornecimento;</div>
-      <div>09. Certidão Conjunta Federal (Tributos/União);</div>
-      <div>10. Certidão Negativa Trabalhista;</div>
-      <div>11. Certidão Negativa Estadual;</div>
-      <div>12. Certidão Negativa de Dívida Ativa Estadual;</div>
-      <div>13. Certidão Negativa Municipal;</div>
-      <div>14. Certidão Negativa de Dívida Ativa Municipal;</div>
-      <div>15. Certidão de Regularidade do FGTS;</div>
-      <div>16. Comprovante Sinc;</div>
+    <div className="grid grid-cols-2 gap-x-4 text-[8.5pt] leading-tight mb-2 pl-1">
+      <div className="space-y-0.5">
+        <div>01. Autorização de Pagamento;</div>
+        <div>02. Solicitação de Pagamento;</div>
+        <div>03. Cópia do Extrato do Contrato;</div>
+        <div>04. Nota de Empenho n.º {structuredData.num_empenho};</div>
+        <div>05. Nota de Liquidação n.º {structuredData.num_liquidacao};</div>
+        <div>06. Nota Fiscal n.º <b>{structuredData.num_nota_fiscal}</b>, validada e atestada;</div>
+        <div>07. Ordem de Fornecimento;</div>
+        <div>08. Certidão Positiva com Efeitos de Negativa de Débitos Relativos aos Tributos Federais e à Dívida Ativa da União;</div>
+      </div>
+      <div className="space-y-0.5">
+        <div>09. Certidão Estadual Negativa de Débitos e da Dívida Ativa;</div>
+        <div>10. Certidão Municipal Negativa de Débitos e da Dívida Ativa;</div>
+        <div>11. Certidão de Regularidade do FGTS;</div>
+        <div>12. Certidão Negativa de Débitos Trabalhistas;</div>
+        <div>13. Comprovante Sinc;</div>
+      </div>
     </div>
-  </>
-);
 
-const ReportPage2 = ({ structuredData }: { structuredData: any }) => (
-  <>
-    <p className="no-indent">
-      Após verificação de todos os documentos anexados ao presente processo de pagamento, esta Controladoria Geral do Município de Barra do Corda/MA, conclui:
+    <p className="mb-2">
+      Após verificação de todos os documentos anexados ao presente processo de pagamento, conclui:
     </p>
 
-    <div className="section-title">III - CONCLUSÃO</div>
+    <div className="section-title">II– CONCLUSÃO</div>
     
-    <p>
+    <p className="mb-1.5">
       Tendo em vista o exposto, levando em consideração a análise da fase de pagamento e considerando os dados extraídos dos autos em apreço, constata-se que os termos apresentados, cumprem parcialmente as exigências contidas legislação vigente, sobretudo a Lei n.º 4.320/64 e Lei n.º {structuredData.lei_regencia || '14.133/21'}.
     </p>
-    
-    {(structuredData.is_lei_8666 || structuredData.lei_regencia === '8.666/93') && (
-      <p>
-        É importante ressaltarmos que o contrato deste processo é regido pela Lei n.º 8.666/93, tendo em vista que o contrato do presente foi assinado anterior a vigência da Lei n.º 14.133/21, estando assim em conformidade com o artigo 190 da presente lei vigente.
-      </p>
-    )}
-    
-    <p>
-      Nesse sentido, esta Controladoria emite parecer pela APROVAÇÃO CONDICIONADA do pagamento em apreço, baseada na comprovação da regularidade fiscal e ateste do fiscal de contrato.
-    </p>
 
-    <p>
+    <p className="mb-1.5">
       Ademais é imperioso destacarmos que será necessária a juntada de certidões atualizadas, quando estas na data do pagamento não estiverem vigentes, para que então posterior seja realizado o pagamento da presente despesa.
     </p>
 
-    <p>
+    <p className="mb-2">
       Encaminho os autos ao prosseguimento do feito. Assim devem cumprir as exigências da cláusula de pagamento do contrato e fiscalização.
     </p>
 
-    <p>Salvo o melhor Juízo.</p>
-    <p>É o parecer.</p>
+    <p className="no-indent">Salvo o melhor Juízo.</p>
+    <p className="no-indent font-bold mt-1 mb-2">É o despacho.</p>
 
-    <div className="text-right mt-8 mb-12 no-indent">
+    <div className="text-right mb-6 no-indent">
       Barra do Corda - MA, {structuredData.dia} de {structuredData.mes} de {structuredData.ano}.
-    </div>
-
-    <div className="signature-block no-indent">
-      <div className="name uppercase">ANDERSON PEREIRA GOMES</div>
-      <div className="text-[10pt] font-bold uppercase">CONTROLADOR GERAL INTERINO DO MUNICÍPIO</div>
-      <div className="text-[10pt] font-bold uppercase">PORTARIA N.º 203/2025</div>
     </div>
   </>
 );
@@ -286,9 +262,6 @@ const ReportDocument = ({ structuredData }: { structuredData: any }) => (
   <div className="print-document flex flex-col gap-6 no-print-gap">
     <div className="print-page">
       <ReportPage1 structuredData={structuredData} />
-    </div>
-    <div className="print-page">
-      <ReportPage2 structuredData={structuredData} />
     </div>
   </div>
 );
@@ -540,6 +513,7 @@ export default function App() {
       num_aditivo: '',
       num_apostilamento: '',
       num_adesao: '',
+      num_registro_preco: '',
       valor: '',
       valor_extenso: '',
       credor: '',
@@ -580,6 +554,7 @@ export default function App() {
           num_aditivo: cleanOptionalField(serverStructured.num_aditivo),
           num_apostilamento: cleanOptionalField(serverStructured.num_apostilamento),
           num_adesao: cleanOptionalField(serverStructured.num_adesao),
+          num_registro_preco: cleanOptionalField(serverStructured.num_registro_preco),
           credor: cleanCredor(serverStructured.credor || ''),
           valor_extenso: valorPorExtenso(serverStructured.valor || ''),
           secretaria: cleanSecretaria(serverStructured.secretaria),
@@ -723,6 +698,9 @@ export default function App() {
         // Adesão no histórico
         num_adesao: text.match(/(?:Termo\s+de\s+Ades[ãa]o|Ades[ãa]o|Adesao)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
         
+        // Registro de Preço no histórico
+        num_registro_preco: text.match(/(?:Ata\s+de\s+Registro\s+de\s+Pre[çc]o|Registro\s+de\s+Pre[çc]o|RP|SRP)\s*(?:n[ºo°.]|n|#)?\s*(\d+(?:\.\d+)*[\/\-]\d+)/i)?.[1] || '',
+        
         // Complex fields handled by keywords
         credor: findAfter(['Credor', 'RAZÃO SOCIAL', 'NOME DO CREDOR', 'CONTRATADA', 'EMPRESA'], 60),
         
@@ -750,6 +728,7 @@ export default function App() {
         num_aditivo: cleanOptionalField(regexData.num_aditivo),
         num_apostilamento: cleanOptionalField(regexData.num_apostilamento),
         num_adesao: cleanOptionalField(regexData.num_adesao),
+        num_registro_preco: cleanOptionalField(regexData.num_registro_preco),
         credor: cleanCredor(regexData.credor || ''),
         valor_extenso: valorPorExtenso(regexData.valor || ''),
         secretaria: cleanSecretaria(regexData.secretaria),
@@ -801,6 +780,7 @@ export default function App() {
         - num_aditivo: Número do Termo Aditivo, caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
         - num_apostilamento: Número do Termo de Apostilamento, caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
         - num_adesao: Número da Adesão (ex: Adesão de SRP nº X), caso esteja mencionada no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
+        - num_registro_preco: Número do Registro de Preço / Ata de Registro de Preço (ex: Registro de Preço nº 05/2025, SRP nº 05/2025), caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
         - valor: Valor total/liquidado (Ex: R$ 34.923,00).
         - credor: Razão Social ou Nome do Credor.
         - cnpj: CNPJ do Credor.
@@ -835,6 +815,7 @@ export default function App() {
                     num_aditivo: { type: Type.STRING },
                     num_apostilamento: { type: Type.STRING },
                     num_adesao: { type: Type.STRING },
+                    num_registro_preco: { type: Type.STRING },
                     valor: { type: Type.STRING },
                     credor: { type: Type.STRING },
                     cnpj: { type: Type.STRING },
@@ -871,6 +852,7 @@ export default function App() {
             num_aditivo: cleanOptionalField(aiStructured.num_aditivo !== undefined ? aiStructured.num_aditivo : prev.num_aditivo),
             num_apostilamento: cleanOptionalField(aiStructured.num_apostilamento !== undefined ? aiStructured.num_apostilamento : prev.num_apostilamento),
             num_adesao: cleanOptionalField(aiStructured.num_adesao !== undefined ? aiStructured.num_adesao : prev.num_adesao),
+            num_registro_preco: cleanOptionalField(aiStructured.num_registro_preco !== undefined ? aiStructured.num_registro_preco : prev.num_registro_preco),
             credor: cleanCredor(aiStructured.credor || prev.credor || ''),
             valor_extenso: valorPorExtenso(rawVal),
             secretaria: cleanSecretaria(aiStructured.secretaria || prev.secretaria || ''),
@@ -911,7 +893,7 @@ export default function App() {
       const valorText = (structuredData.valor || '0,00').trim();
       
       const secPart = secretariaText ? ` - ${secretariaText}` : '';
-      const fileName = `PARECER ${credorText}${secPart} - R$ ${valorText} - NF ${nfText}.docx`
+      const fileName = `DESPACHO ${credorText}${secPart} - R$ ${valorText} - NF ${nfText}.docx`
         .replace(/[/\\?%*:|"<>]/g, '-'); // Sanitização básica
         
       a.download = fileName;
@@ -963,7 +945,7 @@ export default function App() {
           
           <div className="absolute inset-x-0 mx-auto flex justify-center pointer-events-none">
             <h1 className="text-xl font-extrabold tracking-widest text-slate-800 select-none pointer-events-auto">
-              APARECEDOR
+              DESPACHADOR
             </h1>
           </div>
           
@@ -1083,7 +1065,7 @@ export default function App() {
                       </div>
                       <FileUpload onFileSelect={handleExtraction} isLoading={isLoading} />
                       <p className="text-[10px] text-[#94a3b8] mt-4 leading-relaxed italic text-center">
-                        * O upload da imagem preenche automaticamente o parecer usando Inteligência Artificial.
+                        * O upload da imagem preenche automaticamente o despacho usando Inteligência Artificial.
                       </p>
                     </div>
 
@@ -1127,7 +1109,7 @@ export default function App() {
                   <div className="bg-white rounded-[24px] border border-[#e2e8f0] p-8 shadow-sm flex flex-col overflow-hidden">
                     <div className="flex items-center justify-between mb-6 shrink-0">
                       <div className="flex flex-col">
-                        <h2 className="text-lg font-bold text-[#1e293b]">Dados do Parecer</h2>
+                        <h2 className="text-lg font-bold text-[#1e293b]">Dados do Despacho</h2>
                         {selectedMode === 'form' && (
                           <button 
                             onClick={() => {
@@ -1155,7 +1137,7 @@ export default function App() {
                         onClick={goToResult}
                         className="bg-[#2563eb] text-[#ffffff] px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-200"
                       >
-                        Gerar Parecer →
+                        Gerar Despacho →
                       </button>
                     </div>
                     
@@ -1201,7 +1183,7 @@ export default function App() {
                         📄
                       </div>
                       <h2 className="text-xl font-bold text-slate-800">
-                        Parecer Gerado com Sucesso!
+                        Despacho Gerado com Sucesso!
                       </h2>
                       <p className="text-slate-500 text-xs mt-1.5 max-w-sm">
                         O conteúdo foi formatado e está pronto para download.
@@ -1218,7 +1200,7 @@ export default function App() {
                           💾
                         </div>
                         <div className="text-left">
-                          <div className="font-bold text-lg">{isExporting ? 'Gerando Word...' : 'Baixar Parecer (.docx)'}</div>
+                          <div className="font-bold text-lg">{isExporting ? 'Gerando Word...' : 'Baixar Despacho (.docx)'}</div>
                           <div className="text-[12px] opacity-70">Download automático iniciado</div>
                         </div>
                       </button>
@@ -1237,7 +1219,7 @@ export default function App() {
                            onClick={handleNewParecer}
                            className="h-12 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
                          >
-                           Novo Parecer
+                           Novo Despacho
                          </button>
                        </div>
                     </div>

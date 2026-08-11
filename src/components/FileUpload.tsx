@@ -9,7 +9,7 @@ interface FileUploadProps {
 
 export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [selectedFileInfo, setSelectedFileInfo] = useState<{ name: string; size: number } | null>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -31,19 +31,18 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading 
 
   const handleFile = (file: File) => {
     onFileSelect(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setSelectedFileInfo({
+      name: file.name,
+      size: file.size
+    });
   };
 
-  const clearPreview = () => {
-    setPreview(null);
+  const clearFile = () => {
+    setSelectedFileInfo(null);
   };
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-4">
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -77,33 +76,30 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading 
       </div>
 
       <AnimatePresence>
-        {preview && (
+        {selectedFileInfo && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="flex flex-col gap-4"
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 5 }}
+            className="flex items-center justify-between p-3.5 bg-slate-100 border border-slate-200 rounded-xl"
           >
-            <div className="flex items-center justify-between">
-              <h3 className="text-[13px] font-semibold uppercase tracking-wider text-text-muted">
-                Visualização
-              </h3>
-              <button
-                onClick={clearPreview}
-                className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded border border-red-100 font-bold hover:bg-red-100 transition-colors"
-              >
-                REMOVER
-              </button>
-            </div>
-            
-            <div className="w-full h-80 bg-slate-200 rounded-lg overflow-hidden relative shadow-inner">
-              <img src={preview} alt="Preview" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-              <div className="absolute inset-x-0 bottom-0 h-10 bg-black/20 backdrop-blur-sm flex items-center justify-center">
-                <p className="text-[10px] text-white font-bold tracking-widest px-4 truncate">
-                  {preview.substring(0, 50)}...
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="text-lg">📄</span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-700 truncate max-w-[200px] sm:max-w-xs">
+                  {selectedFileInfo.name}
+                </p>
+                <p className="text-[10px] text-slate-400 font-semibold">
+                  {(selectedFileInfo.size / 1024).toFixed(1)} KB
                 </p>
               </div>
             </div>
+            <button
+              onClick={clearFile}
+              className="text-[10px] font-bold text-slate-500 hover:text-red-650 px-2.5 py-1.5 rounded-lg hover:bg-slate-200 transition-colors uppercase"
+            >
+              Limpar
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
