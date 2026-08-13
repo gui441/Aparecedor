@@ -425,10 +425,19 @@ export const apiService = {
         linebreaks: true,
       });
 
+      let contratoLine = `Contrato n.º ${structured.num_contrato || ''}`;
+      if (structured.num_adesao) {
+        contratoLine += ` – Adesão n.º ${structured.num_adesao}`;
+      }
+      if (structured.num_pregao) {
+        contratoLine += ` – ${structured.tipo_pregao || 'Pregão Eletrônico'} n.º ${structured.num_pregao}`;
+      } else if (!structured.num_adesao) {
+        contratoLine += ` – ${structured.tipo_pregao || 'Pregão Eletrônico'} n.º ${structured.num_pregao || ''}`;
+      }
+
       const aditivosParts = [];
       if (structured.num_aditivo) aditivosParts.push(`Termo Aditivo n.º ${structured.num_aditivo}`);
       if (structured.num_apostilamento) aditivosParts.push(`Termo de Apostilamento n.º ${structured.num_apostilamento}`);
-      if (structured.num_adesao) aditivosParts.push(`Adesão n.º ${structured.num_adesao}`);
       if (structured.num_registro_preco) aditivosParts.push(`Registro de Preço n.º ${structured.num_registro_preco}`);
       
       const aditivosLine = aditivosParts.join(' – ');
@@ -437,6 +446,7 @@ export const apiService = {
       doc.render({
         tipo_pregao: 'Pregão Eletrônico',
         ...structured,
+        contrato_line: contratoLine,
         aditivos_line: aditivosLine,
         has_aditivos_line: hasAditivosLine,
         title: title || 'PARECER DO CONTROLE INTERNO MUNICIPAL',

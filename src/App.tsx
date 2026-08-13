@@ -193,12 +193,15 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
     <div className="header-field font-bold">
       Objeto: Pagamento da Nota Fiscal n.º {structuredData.num_nota_fiscal}, da Secretaria {structuredData.secretaria ? (structuredData.secretaria.toLowerCase().startsWith('secretaria') ? structuredData.secretaria : `Municipal de ${structuredData.secretaria}`) : ''} desta Municipalidade.
     </div>
-    <div className="header-field font-bold">Contrato n.º {structuredData.num_contrato} – {structuredData.tipo_pregao || 'Dispensa'} n.º {structuredData.num_pregao}</div>
+    <div className="header-field font-bold">
+      Contrato n.º {structuredData.num_contrato}
+      {structuredData.num_adesao ? ` – Adesão n.º ${structuredData.num_adesao}` : ''}
+      {structuredData.num_pregao ? ` – ${structuredData.tipo_pregao || 'Pregão Eletrônico'} n.º ${structuredData.num_pregao}` : (!structuredData.num_adesao ? ` – ${structuredData.tipo_pregao || 'Dispensa'} n.º ${structuredData.num_pregao || ''}` : '')}
+    </div>
     {(() => {
       const parts = [];
       if (structuredData.num_aditivo) parts.push(`Termo Aditivo n.º ${structuredData.num_aditivo}`);
       if (structuredData.num_apostilamento) parts.push(`Termo de Apostilamento n.º ${structuredData.num_apostilamento}`);
-      if (structuredData.num_adesao) parts.push(`Adesão n.º ${structuredData.num_adesao}`);
       if (structuredData.num_registro_preco) parts.push(`Registro de Preço n.º ${structuredData.num_registro_preco}`);
       if (parts.length === 0) return null;
       return <div className="header-field font-bold">{parts.join(' – ')}</div>;
