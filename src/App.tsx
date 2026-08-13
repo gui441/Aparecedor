@@ -211,7 +211,7 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
       Verifica-se nos autos os documentos que embasaram o presente processo de pagamento, conforme segue:
     </p>
     
-    <div className="grid grid-cols-2 gap-x-4 text-[8.5pt] leading-tight mb-2 pl-1">
+    <div className="grid grid-cols-2 gap-x-4 text-[9.5pt] leading-normal mb-2 pl-1">
       <div className="space-y-0.5">
         <div>01. Autorização de Pagamento;</div>
         <div>02. Solicitação de Pagamento;</div>
@@ -250,7 +250,7 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
     </p>
 
     <p className="no-indent">Salvo o melhor Juízo.</p>
-    <p className="no-indent font-bold mt-1 mb-2">É o despacho.</p>
+    <p className="no-indent font-bold mt-0 mb-2">É o despacho.</p>
 
     <div className="text-right mb-6 no-indent">
       Barra do Corda - MA, {structuredData.dia} de {structuredData.mes} de {structuredData.ano}.

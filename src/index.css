@@ -72,8 +72,8 @@
 /* Estilos do Documento (Simulação e Impressão) */
 .print-document {
   font-family: "Times New Roman", Times, serif;
-  font-size: 10.5pt; /* Ajustado para 10.5pt para perfeito aproveitamento de espaço */
-  line-height: 1.4;  /* Altura de linha equilibrada, profissional e compacta */
+  font-size: 9.5pt;
+  line-height: 1.5;
   color: black;
   text-align: justify;
 }

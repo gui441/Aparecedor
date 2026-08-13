@@ -32,13 +32,13 @@ async function createTemplate() {
         document: {
           run: {
             font: "Times New Roman",
-            size: 20, // 10pt
+            size: 19, // 9.5pt (2 * 9.5 = 19 half-points)
             color: "000000",
           },
           paragraph: {
             alignment: AlignmentType.JUSTIFIED,
             spacing: {
-              line: 320,
+              line: 360, // 1.5 line spacing (240 * 1.5)
               before: 0,
               after: 0,
             },
@@ -53,12 +53,12 @@ async function createTemplate() {
           next: "Normal",
           run: {
             font: "Times New Roman",
-            size: 20, // 10pt
+            size: 19, // 9.5pt
             color: "000000",
           },
           paragraph: {
             alignment: AlignmentType.JUSTIFIED,
-            spacing: { line: 320, after: 120 },
+            spacing: { line: 360, after: 120 },
             indent: { firstLine: 652 }, // 1.15cm
           },
         },
@@ -69,12 +69,12 @@ async function createTemplate() {
           next: "Normal",
           run: {
             font: "Times New Roman",
-            size: 20,
+            size: 19, // 9.5pt
             color: "000000",
           },
           paragraph: {
             alignment: AlignmentType.JUSTIFIED,
-            spacing: { line: 300, after: 60 },
+            spacing: { line: 360, after: 60 },
             indent: { firstLine: 0 },
           },
         },
@@ -143,12 +143,12 @@ async function createTemplate() {
                 text: "DESPACHO",
                 bold: true,
                 font: "Times New Roman",
-                size: 22, // 11pt
+                size: 19, // 9.5pt
                 color: "000000",
               }),
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { line: 320, before: 0, after: 180 },
+            spacing: { line: 360, before: 0, after: 180 },
           }),
 
           new Paragraph({
@@ -220,18 +220,18 @@ async function createTemplate() {
               new TextRun({ text: "R$ ", bold: true }),
               new TextRun({ text: "{valor}", bold: true }),
             ],
-            spacing: { line: 320, after: 180 },
+            spacing: { line: 360, after: 180 },
           }),
 
           new Paragraph({
             style: "DespachoHeader",
             children: [new TextRun({ text: "I - DA ANÁLISE DOS DOCUMENTOS ANEXADOS", bold: true })],
-            spacing: { line: 320, before: 120, after: 120 },
+            spacing: { line: 360, before: 120, after: 120 },
           }),
           new Paragraph({
             style: "DespachoPara",
             text: "Verifica-se nos autos os documentos que embasaram o presente processo de pagamento, conforme segue:",
-            spacing: { line: 320, after: 120 },
+            spacing: { line: 360, after: 120 },
           }),
 
           new Table({
@@ -250,24 +250,24 @@ async function createTemplate() {
                   new TableCell({
                     width: { size: 50, type: WidthType.PERCENTAGE },
                     children: [
-                      new Paragraph({ text: "01. Autorização de Pagamento;", spacing: { line: 280 } }),
-                      new Paragraph({ text: "02. Solicitação de Pagamento;", spacing: { line: 280 } }),
-                      new Paragraph({ text: "03. Cópia do Extrato do Contrato;", spacing: { line: 280 } }),
-                      new Paragraph({ children: [new TextRun("04. Nota de Empenho n.º "), new TextRun({ text: "{num_empenho}", bold: true })], spacing: { line: 280 } }),
-                      new Paragraph({ children: [new TextRun("05. Nota de Liquidação n.º "), new TextRun({ text: "{num_liquidacao}", bold: true })], spacing: { line: 280 } }),
-                      new Paragraph({ children: [new TextRun("06. Nota Fiscal n.º "), new TextRun({ text: "{num_nota_fiscal}", bold: true }), new TextRun(", validada e atestada;")], spacing: { line: 280 } }),
-                      new Paragraph({ text: "07. Ordem de Fornecimento;", spacing: { line: 280 } }),
-                      new Paragraph({ text: "08. Certidão Positiva com Efeitos de Negativa de Débitos Relativos aos Tributos Federais e à Dívida Ativa da União;", spacing: { line: 280 } }),
+                      new Paragraph({ text: "01. Autorização de Pagamento;", spacing: { line: 360 } }),
+                      new Paragraph({ text: "02. Solicitação de Pagamento;", spacing: { line: 360 } }),
+                      new Paragraph({ text: "03. Cópia do Extrato do Contrato;", spacing: { line: 360 } }),
+                      new Paragraph({ children: [new TextRun("04. Nota de Empenho n.º "), new TextRun({ text: "{num_empenho}", bold: true })], spacing: { line: 360 } }),
+                      new Paragraph({ children: [new TextRun("05. Nota de Liquidação n.º "), new TextRun({ text: "{num_liquidacao}", bold: true })], spacing: { line: 360 } }),
+                      new Paragraph({ children: [new TextRun("06. Nota Fiscal n.º "), new TextRun({ text: "{num_nota_fiscal}", bold: true }), new TextRun(", validada e atestada;")], spacing: { line: 360 } }),
+                      new Paragraph({ text: "07. Ordem de Fornecimento;", spacing: { line: 360 } }),
+                      new Paragraph({ text: "08. Certidão Positiva com Efeitos de Negativa de Débitos Relativos aos Tributos Federais e à Dívida Ativa da União;", spacing: { line: 360 } }),
                     ],
                   }),
                   new TableCell({
                     width: { size: 50, type: WidthType.PERCENTAGE },
                     children: [
-                      new Paragraph({ text: "09. Certidão Estadual Negativa de Débitos e da Dívida Ativa;", spacing: { line: 280 } }),
-                      new Paragraph({ text: "10. Certidão Municipal Negativa de Débitos e da Dívida Ativa;", spacing: { line: 280 } }),
-                      new Paragraph({ text: "11. Certidão de Regularidade do FGTS;", spacing: { line: 280 } }),
-                      new Paragraph({ text: "12. Certidão Negativa de Débitos Trabalhistas;", spacing: { line: 280 } }),
-                      new Paragraph({ text: "13. Comprovante Sinc;", spacing: { line: 280 } }),
+                      new Paragraph({ text: "09. Certidão Estadual Negativa de Débitos e da Dívida Ativa;", spacing: { line: 360 } }),
+                      new Paragraph({ text: "10. Certidão Municipal Negativa de Débitos e da Dívida Ativa;", spacing: { line: 360 } }),
+                      new Paragraph({ text: "11. Certidão de Regularidade do FGTS;", spacing: { line: 360 } }),
+                      new Paragraph({ text: "12. Certidão Negativa de Débitos Trabalhistas;", spacing: { line: 360 } }),
+                      new Paragraph({ text: "13. Comprovante Sinc;", spacing: { line: 360 } }),
                     ],
                   }),
                 ],
@@ -278,13 +278,13 @@ async function createTemplate() {
           new Paragraph({
             style: "DespachoPara",
             text: "Após verificação de todos os documentos anexados ao presente processo de pagamento, conclui:",
-            spacing: { line: 320, before: 140, after: 120 },
+            spacing: { line: 360, before: 140, after: 120 },
           }),
 
           new Paragraph({
             style: "DespachoHeader",
             children: [new TextRun({ text: "II– CONCLUSÃO", bold: true })],
-            spacing: { line: 320, before: 120, after: 120 },
+            spacing: { line: 360, before: 120, after: 120 },
           }),
           new Paragraph({
             style: "DespachoPara",
@@ -308,14 +308,14 @@ async function createTemplate() {
           new Paragraph({ 
             text: "Salvo o melhor Juízo.", 
             alignment: AlignmentType.LEFT,
-            spacing: { line: 320, before: 0, after: 0 },
+            spacing: { line: 360, before: 0, after: 0 },
             indent: { firstLine: 652 },
             run: { font: "Times New Roman" }
           }),
           new Paragraph({ 
             text: "É o despacho.", 
             alignment: AlignmentType.LEFT, 
-            spacing: { line: 320, before: 120, after: 0 },
+            spacing: { line: 360, before: 0, after: 0 },
             indent: { firstLine: 652 },
             run: { font: "Times New Roman", bold: true }
           }),
@@ -323,7 +323,7 @@ async function createTemplate() {
           new Paragraph({
             text: "Barra do Corda - MA, {dia} de {mes} de {ano}.",
             alignment: AlignmentType.RIGHT,
-            spacing: { line: 320, before: 140, after: 280 },
+            spacing: { line: 360, before: 140, after: 280 },
             run: { font: "Times New Roman" }
           }),
         ],
