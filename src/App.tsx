@@ -3,8 +3,11 @@ import { FileUpload } from './components/FileUpload';
 import { ScannerFolderConfig } from './components/ScannerFolderConfig';
 import { getScannerHandle, saveScannerHandle, clearScannerHandle } from './utils/scannerStorage';
 import { Editor } from './components/Editor';
+import { RecentProcessesModal } from './components/RecentProcessesModal';
+import { getRecentProcesses, saveRecentProcess, deleteRecentProcess, clearRecentProcesses } from './utils/recentProcesses';
+import { RecentProcess, DespachoData } from './types';
 import { apiService } from './services/api';
-import { AlertCircle, Layout, Printer, Info, Sparkles, Check, Settings, Key, X, AlertTriangle } from 'lucide-react';
+import { AlertCircle, Layout, Printer, Info, Sparkles, Check, Settings, Key, X, AlertTriangle, History, Clock, FileText, Download, ArrowRight, Trash2, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { valorPorExtenso } from './utils/currency';
@@ -276,6 +279,9 @@ export default function App() {
     return localStorage.getItem('gemini_api_key_custom') || '';
   });
   const [showApiModal, setShowApiModal] = useState(false);
+  const [showRecentModal, setShowRecentModal] = useState(false);
+  const [recentProcesses, setRecentProcesses] = useState<RecentProcess[]>(() => getRecentProcesses());
+  const [activeProcessId, setActiveProcessId] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState<string>('');
   const [structuredData, setStructuredData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -552,7 +558,7 @@ export default function App() {
         }
         // We received perfect structured values directly from the server-side multimodal Gemini OCR!
         // No client-side regex or second refinement LLM call is required.
-        setStructuredData({
+        const newStructured = {
           ...serverStructured,
           num_aditivo: cleanOptionalField(serverStructured.num_aditivo),
           num_apostilamento: cleanOptionalField(serverStructured.num_apostilamento),
@@ -566,7 +572,11 @@ export default function App() {
           dia: now.getDate().toString(),
           mes: now.toLocaleString('pt-BR', { month: 'long' }),
           ano: now.getFullYear().toString()
-        });
+        };
+        setStructuredData(newStructured);
+        const saved = saveRecentProcess(newStructured, rawText);
+        setActiveProcessId(saved.id);
+        setRecentProcesses(getRecentProcesses());
         setCurrentStep(AppStep.SETUP);
         setIsLoading(false);
         return;
@@ -849,7 +859,7 @@ export default function App() {
         // Update with AI data, keeping date context
         setStructuredData((prev: any) => {
           const rawVal = aiStructured.valor || prev.valor || '';
-          return {
+          const updated = {
             ...prev,
             ...aiStructured,
             num_aditivo: cleanOptionalField(aiStructured.num_aditivo !== undefined ? aiStructured.num_aditivo : prev.num_aditivo),
@@ -864,6 +874,10 @@ export default function App() {
             mes: prev.mes,
             ano: prev.ano
           };
+          const saved = saveRecentProcess(updated, rawText, activeProcessId || undefined);
+          setActiveProcessId(saved.id);
+          setRecentProcesses(getRecentProcesses());
+          return updated;
         });
       } catch (aiErr) {
         console.warn('AI structuring failed, using regex results:', aiErr);
@@ -884,6 +898,11 @@ export default function App() {
     if (!structuredData) return;
     setIsExporting(true);
     try {
+      // Auto-salvar no histórico ao exportar
+      const saved = saveRecentProcess(structuredData, extractedText, activeProcessId || undefined);
+      setActiveProcessId(saved.id);
+      setRecentProcesses(getRecentProcesses());
+
       const blob = await apiService.exportToWord(structuredData);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -913,6 +932,11 @@ export default function App() {
   };
 
   const goToResult = () => {
+    if (structuredData) {
+      const saved = saveRecentProcess(structuredData, extractedText, activeProcessId || undefined);
+      setActiveProcessId(saved.id);
+      setRecentProcesses(getRecentProcesses());
+    }
     setCurrentStep(AppStep.RESULT);
     handleExport(); // Iniciar download automático ao gerar
   };
@@ -924,8 +948,33 @@ export default function App() {
   const handleNewParecer = () => {
     setExtractedText('');
     setStructuredData(null);
+    setActiveProcessId(null);
     setCurrentStep(AppStep.CHOICE);
     setError(null);
+  };
+
+  const handleSelectRecentProcess = (process: RecentProcess) => {
+    setStructuredData({ ...process.structuredData });
+    setExtractedText(process.extractedText || '');
+    setActiveProcessId(process.id);
+    setSelectedMode('form');
+    setCurrentStep(AppStep.SETUP);
+    setShowRecentModal(false);
+    setError(null);
+  };
+
+  const handleDeleteRecentProcess = (id: string) => {
+    const updated = deleteRecentProcess(id);
+    setRecentProcesses(updated);
+    if (activeProcessId === id) {
+      setActiveProcessId(null);
+    }
+  };
+
+  const handleClearAllRecentProcesses = () => {
+    clearRecentProcesses();
+    setRecentProcesses([]);
+    setActiveProcessId(null);
   };
 
   const startWithMode = (mode: 'image' | 'form') => {
@@ -952,7 +1001,21 @@ export default function App() {
             </h1>
           </div>
           
-          <div className="w-1/3 flex justify-end items-center gap-5">
+          <div className="w-1/3 flex justify-end items-center gap-3 sm:gap-4">
+            <button
+              onClick={() => setShowRecentModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all cursor-pointer shadow-sm pointer-events-auto"
+              title="Acessar histórico de processos recentes salvos"
+            >
+              <History className="w-3.5 h-3.5 text-blue-600" />
+              <span className="hidden sm:inline">Recentes</span>
+              {recentProcesses.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 text-[10px] font-extrabold border border-blue-200">
+                  {recentProcesses.length}
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => setShowApiModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:border-slate-300 transition-all cursor-pointer shadow-sm pointer-events-auto"
@@ -993,7 +1056,7 @@ export default function App() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="h-full flex flex-col items-center justify-center p-6 max-w-4xl mx-auto w-full"
+                className="h-full flex flex-col items-center justify-center p-6 max-w-4xl mx-auto w-full overflow-y-auto custom-scrollbar"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
                   <button 
@@ -1027,7 +1090,62 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="mt-16 text-[#94a3b8] flex items-center gap-2">
+                {/* Seção de Processos Recentes para Acesso Rápido */}
+                {recentProcesses.length > 0 && (
+                  <div className="mt-8 w-full bg-white rounded-3xl p-5 border border-slate-200/90 shadow-lg shadow-slate-100">
+                    <div className="flex items-center justify-between mb-3 px-1">
+                      <div className="flex items-center gap-2">
+                        <History className="w-4 h-4 text-blue-600" />
+                        <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                          Processos Recentes ({recentProcesses.length})
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setShowRecentModal(true)}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline cursor-pointer"
+                      >
+                        <span>Ver todos ({recentProcesses.length})</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {recentProcesses.slice(0, 3).map((item) => {
+                        const d = item.structuredData || {};
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => handleSelectRecentProcess(item)}
+                            className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/60 hover:bg-blue-50/50 hover:border-blue-300 transition-all cursor-pointer text-left group flex flex-col justify-between"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600 line-clamp-1">
+                                  {d.credor || 'Credor não informado'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                                  {item.dateFormatted?.split(' ')[0]}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-500 space-y-0.5">
+                                {d.num_processo && <p className="font-semibold text-slate-700">Proc: {d.num_processo}</p>}
+                                {d.num_nota_fiscal && <p>NF: {d.num_nota_fiscal}</p>}
+                                {d.valor && <p className="text-emerald-700 font-bold">R$ {d.valor.toString().replace(/^R\$\s*/, '')}</p>}
+                              </div>
+                            </div>
+
+                            <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] font-bold text-blue-600">
+                              <span>Continuar / Editar</span>
+                              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-8 text-[#94a3b8] flex items-center gap-2">
                   <span className="w-2 h-2 bg-green-400 rounded-full"></span>
                   <span className="text-xs font-bold uppercase tracking-widest">Sistema de Controle Interno Ativo</span>
                 </div>
@@ -1211,12 +1329,19 @@ export default function App() {
 
                     <div className="mt-8 pt-8 border-t border-[#f1f5f9]">
                        <h3 className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-widest mb-4">Outras Opções</h3>
-                       <div className="grid grid-cols-2 gap-3">
+                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                          <button 
                            onClick={goBackToSetup}
                            className="h-12 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
                          >
                            Editar Dados
+                         </button>
+                         <button 
+                           onClick={() => setShowRecentModal(true)}
+                           className="h-12 rounded-xl bg-blue-50 border border-blue-200 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition-colors uppercase cursor-pointer flex items-center justify-center gap-1.5"
+                         >
+                           <History className="w-3.5 h-3.5 text-blue-600" />
+                           <span>Recentes ({recentProcesses.length})</span>
                          </button>
                          <button 
                            onClick={handleNewParecer}
@@ -1385,6 +1510,16 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Modal de Processos Recentes / Memória */}
+      <RecentProcessesModal
+        isOpen={showRecentModal}
+        onClose={() => setShowRecentModal(false)}
+        processes={recentProcesses}
+        onSelectProcess={handleSelectRecentProcess}
+        onDeleteProcess={handleDeleteRecentProcess}
+        onClearAll={handleClearAllRecentProcesses}
+      />
     </>
   );
 }
