@@ -300,6 +300,9 @@ export const RecentProcessesModal: React.FC<RecentProcessesModalProps> = ({
                               {data.num_adesao && (
                                 <span className="text-blue-600 font-semibold">• Adesão: {data.num_adesao}</span>
                               )}
+                              {data.num_registro_preco && (
+                                <span className="text-amber-700 font-semibold">• Ata: {data.num_registro_preco}</span>
+                              )}
                               {data.num_pregao && (
                                 <span>• {data.tipo_pregao || 'Pregão'} {data.num_pregao}</span>
                               )}

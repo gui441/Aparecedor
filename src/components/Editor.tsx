@@ -146,19 +146,6 @@ export const Editor: React.FC<EditorProps> = ({
     }
   };
 
-  const forceFormatObjeto = () => {
-    if (structured?.objeto) {
-      let formatted = structured.objeto.trim();
-      if (formatted.length > 0) {
-        formatted = formatted.charAt(0).toLowerCase() + formatted.slice(1);
-      }
-      onStructuredChange({
-        ...structured,
-        objeto: formatted
-      });
-    }
-  };
-
   const copyToClipboard = () => {
     navigator.clipboard.writeText(content);
     setCopied(true);
@@ -274,12 +261,12 @@ export const Editor: React.FC<EditorProps> = ({
               </div>
             )}
 
-            {/* Optional fields: Termo Aditivo, Termo de Apostilamento, Adesão, Registro de Preço */}
+            {/* Optional fields: Termo Aditivo, Termo de Apostilamento, Adesão, Ata de Registro de Preços */}
             <div className="col-span-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-50 border border-slate-200/60 p-4 rounded-2xl">
               <InputField label="Termo Aditivo" value={structured?.num_aditivo || ''} onChange={(val) => updateField('num_aditivo', val)} />
               <InputField label="Termo de Apostilamento" value={structured?.num_apostilamento || ''} onChange={(val) => updateField('num_apostilamento', val)} />
               <InputField label="Adesão" value={structured?.num_adesao || ''} onChange={(val) => updateField('num_adesao', val)} />
-              <InputField label="Registro de Preço" value={structured?.num_registro_preco || ''} onChange={(val) => updateField('num_registro_preco', val)} />
+              <InputField label="Ata de Registro de Preços" value={structured?.num_registro_preco || ''} onChange={(val) => updateField('num_registro_preco', val)} />
             </div>
 
             {/* Legislation Selector Toggles */}
@@ -390,17 +377,7 @@ export const Editor: React.FC<EditorProps> = ({
               helperText={structured?.cnpj && !validarCNPJ(structured.cnpj) ? 'Dígito verificador inválido ou incompleto' : undefined}
             />
             
-            {/* Group 4: Objeto */}
-            <InputField 
-              label="Objeto do Contrato" 
-              value={structured?.objeto || ''} 
-              onChange={(val) => updateField('objeto', val)} 
-              onBlur={forceFormatObjeto} 
-              fullWidth 
-              isTextArea 
-            />
-            
-            {/* Group 5: Empenho e Liquidação */}
+            {/* Group 4: Empenho e Liquidação */}
             <InputField label="Nota de Empenho" value={structured?.num_empenho || ''} onChange={(val) => updateField('num_empenho', val)} />
             <InputField label="Nota de Liquidação" value={structured?.num_liquidacao || ''} onChange={(val) => updateField('num_liquidacao', val)} />
             

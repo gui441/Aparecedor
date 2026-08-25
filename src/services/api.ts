@@ -438,7 +438,7 @@ export const apiService = {
       const aditivosParts = [];
       if (structured.num_aditivo) aditivosParts.push(`Termo Aditivo n.º ${structured.num_aditivo}`);
       if (structured.num_apostilamento) aditivosParts.push(`Termo de Apostilamento n.º ${structured.num_apostilamento}`);
-      if (structured.num_registro_preco) aditivosParts.push(`Registro de Preço n.º ${structured.num_registro_preco}`);
+      if (structured.num_registro_preco) aditivosParts.push(`Ata de Registro de Preços n.º ${structured.num_registro_preco}`);
       
       const aditivosLine = aditivosParts.join(' – ');
       const hasAditivosLine = aditivosParts.length > 0;

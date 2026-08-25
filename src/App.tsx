@@ -205,7 +205,7 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
       const parts = [];
       if (structuredData.num_aditivo) parts.push(`Termo Aditivo n.º ${structuredData.num_aditivo}`);
       if (structuredData.num_apostilamento) parts.push(`Termo de Apostilamento n.º ${structuredData.num_apostilamento}`);
-      if (structuredData.num_registro_preco) parts.push(`Registro de Preço n.º ${structuredData.num_registro_preco}`);
+      if (structuredData.num_registro_preco) parts.push(`Ata de Registro de Preços n.º ${structuredData.num_registro_preco}`);
       if (parts.length === 0) return null;
       return <div className="header-field font-bold">{parts.join(' – ')}</div>;
     })()}
@@ -222,8 +222,8 @@ const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
         <div>01. Autorização de Pagamento;</div>
         <div>02. Solicitação de Pagamento;</div>
         <div>03. Cópia do Extrato do Contrato;</div>
-        <div>04. Nota de Empenho n.º {structuredData.num_empenho};</div>
-        <div>05. Nota de Liquidação n.º {structuredData.num_liquidacao};</div>
+        <div>04. Nota de Empenho n.º <b>{structuredData.num_empenho}</b>;</div>
+        <div>05. Nota de Liquidação n.º <b>{structuredData.num_liquidacao}</b>;</div>
         <div>06. Nota Fiscal n.º <b>{structuredData.num_nota_fiscal}</b>, validada e atestada;</div>
         <div>07. Ordem de Fornecimento;</div>
         <div>08. Certidão Positiva com Efeitos de Negativa de Débitos Relativos aos Tributos Federais e à Dívida Ativa da União;</div>
@@ -793,7 +793,7 @@ export default function App() {
         - num_aditivo: Número do Termo Aditivo, caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
         - num_apostilamento: Número do Termo de Apostilamento, caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
         - num_adesao: Número da Adesão (ex: Adesão de SRP nº X), caso esteja mencionada no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
-        - num_registro_preco: Número do Registro de Preço / Ata de Registro de Preço (ex: Registro de Preço nº 05/2025, SRP nº 05/2025), caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
+        - num_registro_preco: Número da Ata de Registro de Preços (ex: Ata de Registro de Preços nº 05/2025, SRP nº 05/2025), caso esteja mencionado no documento. ATENÇÃO EXTREMA: Se não encontrar nenhuma menção a este campo na imagem, retorne obrigatoriamente uma string vazia ("").
         - valor: Valor total/liquidado (Ex: R$ 34.923,00).
         - credor: Razão Social ou Nome do Credor.
         - cnpj: CNPJ do Credor.
