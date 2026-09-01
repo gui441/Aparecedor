@@ -1,6 +1,6 @@
 {
   "name": "DESPACHADOR",
-  "description": "Aplicativo para extração automática de dados de imagens usando OCR, permitindo edição e exportação para Word.",
+  "description": "Sistema de emissão e impressão de despachos com papel timbrado oficial da Prefeitura de Barra do Corda - MA.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
