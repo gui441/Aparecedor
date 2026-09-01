@@ -24,19 +24,15 @@
   @media print {
     /* RESET UNIVERSAL DE IMPRESSÃO */
     @page {
-      size: A4 portrait;
+      size: A4;
       margin: 0 !important;
     }
 
-    html, body {
+    body {
       background: white !important;
       height: auto !important;
       min-height: 0 !important;
-      margin: 0 !important;
-      padding: 0 !important;
       overflow: visible !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
     }
 
     /* Esconder toda a interface que tenha .no-print */
@@ -59,34 +55,12 @@
       overflow: visible !important;
     }
 
-    /* Reset de alturas no container ancestral do React para garantir fluxo multi-página */
+    /* Reset de de alturas no container ancestral do React para garantir fluxo multi-página */
     #root {
       height: auto !important;
       min-height: 0 !important;
       overflow: visible !important;
       display: block !important;
-    }
-
-    .official-a4-page {
-      width: 210mm !important;
-      height: 297mm !important;
-      max-height: 297mm !important;
-      padding: 4.5cm 2.54cm 3.5cm 2.54cm !important;
-      background-image: url('/timbrado.png') !important;
-      background-size: 210mm 297mm !important;
-      background-repeat: no-repeat !important;
-      background-position: top center !important;
-      background-color: white !important;
-      box-shadow: none !important;
-      margin: 0 auto !important;
-      overflow: hidden !important;
-      box-sizing: border-box !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-      page-break-after: avoid !important;
-      break-after: avoid !important;
     }
   }
 

@@ -7,9 +7,7 @@ import { RecentProcessesModal } from './components/RecentProcessesModal';
 import { getRecentProcesses, saveRecentProcess, deleteRecentProcess, clearRecentProcesses } from './utils/recentProcesses';
 import { RecentProcess, DespachoData } from './types';
 import { apiService } from './services/api';
-import { exportToPDF, printDespachoDirect } from './services/pdfService';
-import { DocumentPreview, OfficialDocumentContent } from './components/DocumentPreview';
-import { AlertCircle, Layout, Printer, Info, Sparkles, Check, Settings, Key, X, AlertTriangle, History, Clock, FileText, Download, FileDown, ArrowRight, Trash2, Building2 } from 'lucide-react';
+import { AlertCircle, Layout, Printer, Info, Sparkles, Check, Settings, Key, X, AlertTriangle, History, Clock, FileText, Download, ArrowRight, Trash2, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { valorPorExtenso } from './utils/currency';
@@ -188,6 +186,92 @@ export function cleanSecretariaForFilename(name: string): string {
     .toUpperCase();
 }
 
+const ReportPage1 = ({ structuredData }: { structuredData: any }) => (
+  <>
+    <h1 className="text-center font-bold text-[11pt] uppercase mb-3 tracking-wide">DESPACHO</h1>
+    
+    <div className="header-field font-bold">Credor: {structuredData.credor}</div>
+    <div className="header-field font-bold">CNPJ: {structuredData.cnpj}</div>
+    <div className="header-field font-bold">Assunto: Análise do Processo Administrativo n.º {structuredData.num_processo}</div>
+    <div className="header-field font-bold">
+      Objeto: Pagamento da Nota Fiscal n.º {structuredData.num_nota_fiscal}, da Secretaria {structuredData.secretaria ? (structuredData.secretaria.toLowerCase().startsWith('secretaria') ? structuredData.secretaria : `Municipal de ${structuredData.secretaria}`) : ''} desta Municipalidade.
+    </div>
+    <div className="header-field font-bold">
+      Contrato n.º {structuredData.num_contrato}
+      {structuredData.num_adesao ? ` – Adesão n.º ${structuredData.num_adesao}` : ''}
+      {structuredData.num_pregao ? ` – ${structuredData.tipo_pregao || 'Pregão Eletrônico'} n.º ${structuredData.num_pregao}` : (!structuredData.num_adesao ? ` – ${structuredData.tipo_pregao || 'Dispensa'} n.º ${structuredData.num_pregao || ''}` : '')}
+    </div>
+    {(() => {
+      const parts = [];
+      if (structuredData.num_aditivo) parts.push(`Termo Aditivo n.º ${structuredData.num_aditivo}`);
+      if (structuredData.num_apostilamento) parts.push(`Termo de Apostilamento n.º ${structuredData.num_apostilamento}`);
+      if (structuredData.num_registro_preco) parts.push(`Ata de Registro de Preços n.º ${structuredData.num_registro_preco}`);
+      if (parts.length === 0) return null;
+      return <div className="header-field font-bold">{parts.join(' – ')}</div>;
+    })()}
+    <div className="header-field font-bold mb-3">Valor: {structuredData.valor?.toString().startsWith('R$') ? structuredData.valor : `R$ ${structuredData.valor}`}{structuredData.valor_extenso ? ` (${structuredData.valor_extenso})` : ''}</div>
+
+    <div className="section-title">I - DA ANÁLISE DOS DOCUMENTOS ANEXADOS</div>
+    
+    <p className="mb-2">
+      Verifica-se nos autos os documentos que embasaram o presente processo de pagamento, conforme segue:
+    </p>
+    
+    <div className="grid grid-cols-2 gap-x-4 text-[9.5pt] leading-normal mb-2 pl-1">
+      <div className="space-y-0.5">
+        <div>01. Autorização de Pagamento;</div>
+        <div>02. Solicitação de Pagamento;</div>
+        <div>03. Cópia do Extrato do Contrato;</div>
+        <div>04. Nota de Empenho n.º <b>{structuredData.num_empenho}</b>;</div>
+        <div>05. Nota de Liquidação n.º <b>{structuredData.num_liquidacao}</b>;</div>
+        <div>06. Nota Fiscal n.º <b>{structuredData.num_nota_fiscal}</b>, validada e atestada;</div>
+        <div>07. Ordem de Fornecimento;</div>
+        <div>08. Certidão Positiva com Efeitos de Negativa de Débitos Relativos aos Tributos Federais e à Dívida Ativa da União;</div>
+      </div>
+      <div className="space-y-0.5">
+        <div>09. Certidão Estadual Negativa de Débitos e da Dívida Ativa;</div>
+        <div>10. Certidão Municipal Negativa de Débitos e da Dívida Ativa;</div>
+        <div>11. Certidão de Regularidade do FGTS;</div>
+        <div>12. Certidão Negativa de Débitos Trabalhistas;</div>
+        <div>13. Comprovante Sinc;</div>
+      </div>
+    </div>
+
+    <p className="mb-2">
+      Após verificação de todos os documentos anexados ao presente processo de pagamento, conclui:
+    </p>
+
+    <div className="section-title">II– CONCLUSÃO</div>
+    
+    <p className="mb-1.5">
+      Tendo em vista o exposto, levando em consideração a análise da fase de pagamento e considerando os dados extraídos dos autos em apreço, constata-se que os termos apresentados, cumprem parcialmente as exigências contidas legislação vigente, sobretudo a Lei n.º 4.320/64 e Lei n.º {structuredData.lei_regencia || '14.133/21'}.
+    </p>
+
+    <p className="mb-1.5">
+      Ademais é imperioso destacarmos que será necessária a juntada de certidões atualizadas, quando estas na data do pagamento não estiverem vigentes, para que então posterior seja realizado o pagamento da presente despesa.
+    </p>
+
+    <p className="mb-2">
+      Encaminho os autos ao prosseguimento do feito. Assim devem cumprir as exigências da cláusula de pagamento do contrato e fiscalização.
+    </p>
+
+    <p className="no-indent">Salvo o melhor Juízo.</p>
+    <p className="no-indent font-bold mt-0 mb-2">É o despacho.</p>
+
+    <div className="text-right mb-6 no-indent">
+      Barra do Corda - MA, {structuredData.dia} de {structuredData.mes} de {structuredData.ano}.
+    </div>
+  </>
+);
+
+const ReportDocument = ({ structuredData }: { structuredData: any }) => (
+  <div className="print-document flex flex-col gap-6 no-print-gap">
+    <div className="print-page">
+      <ReportPage1 structuredData={structuredData} />
+    </div>
+  </div>
+);
+
 export default function App() {
   const [currentStep, setCurrentStep] = useState<AppStep>(AppStep.CHOICE);
   const [selectedMode, setSelectedMode] = useState<'image' | 'form' | null>(null);
@@ -203,7 +287,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isExporting, setIsExporting] = useState(false);
-  const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
 
@@ -811,37 +894,6 @@ export default function App() {
     }
   };
 
-  const handleExportPDF = async () => {
-    if (!structuredData) return;
-    setIsExportingPDF(true);
-    try {
-      const saved = saveRecentProcess(structuredData, extractedText, activeProcessId || undefined);
-      setActiveProcessId(saved.id);
-      setRecentProcesses(getRecentProcesses());
-
-      const element = document.getElementById('preview-despacho-element') || document.getElementById('hidden-despacho-element');
-      if (!element) {
-        throw new Error('Elemento do documento não encontrado para exportação.');
-      }
-      await exportToPDF(element, structuredData);
-    } catch (err) {
-      console.error('Erro na exportação para PDF:', err);
-      setError(`Falha ao gerar PDF: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsExportingPDF(false);
-    }
-  };
-
-  const handleDirectPrint = () => {
-    if (!structuredData) return;
-    const saved = saveRecentProcess(structuredData, extractedText, activeProcessId || undefined);
-    setActiveProcessId(saved.id);
-    setRecentProcesses(getRecentProcesses());
-
-    const element = document.getElementById('preview-despacho-element') || document.getElementById('hidden-despacho-element');
-    printDespachoDirect(element || undefined);
-  };
-
   const handleExport = async () => {
     if (!structuredData) return;
     setIsExporting(true);
@@ -886,6 +938,7 @@ export default function App() {
       setRecentProcesses(getRecentProcesses());
     }
     setCurrentStep(AppStep.RESULT);
+    handleExport(); // Iniciar download automático ao gerar
   };
 
   const goBackToSetup = () => {
@@ -1230,10 +1283,10 @@ export default function App() {
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 1.02 }}
-                className="h-full max-w-7xl mx-auto w-full p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-[460px_1fr] gap-6 overflow-hidden"
+                className="h-full max-w-xl mx-auto w-full p-6 flex flex-col gap-6 justify-center"
               >
-                {/* Left: Actions Panel & Details */}
-                <div className="flex flex-col gap-5 overflow-y-auto pr-1 custom-scrollbar">
+                {/* Actions Panel */}
+                <div className="flex flex-col gap-6">
                   {error && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -1245,132 +1298,73 @@ export default function App() {
                     </motion.div>
                   )}
 
-                  <div className="bg-white rounded-[24px] border border-[#e2e8f0] p-6 shadow-sm flex flex-col gap-5">
-                    <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-                      <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl shadow-inner shrink-0">
-                        ✓
+                  <div className="bg-white rounded-[24px] border border-[#e2e8f0] p-8 shadow-xl">
+                    <div className="flex flex-col items-center justify-center text-center mb-8">
+                      <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner">
+                        📄
                       </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-slate-800 leading-tight">
-                          Despacho Pronto para Impressão
-                        </h2>
-                        <p className="text-slate-500 text-xs mt-0.5">
-                          Documento oficial formatado com papel timbrado da Prefeitura.
-                        </p>
-                      </div>
+                      <h2 className="text-xl font-bold text-slate-800">
+                        Despacho Gerado com Sucesso!
+                      </h2>
+                      <p className="text-slate-500 text-xs mt-1.5 max-w-sm">
+                        O conteúdo foi formatado e está pronto para download.
+                      </p>
                     </div>
 
-                    {/* Primary Export Actions */}
-                    <div className="flex flex-col gap-3">
-                      {/* Botão de Impressão Direta */}
-                      <button
-                        onClick={handleDirectPrint}
-                        className="group w-full p-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-4 transition-all active:scale-[0.98] shadow-lg shadow-emerald-100 hover:shadow-emerald-200 cursor-pointer text-left"
-                      >
-                        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
-                          <Printer className="w-6 h-6 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-bold text-sm">Imprimir / Salvar PDF (Ctrl+P)</div>
-                          <div className="text-[11px] text-emerald-100 truncate">Impressão direta A4 sem margens extras</div>
-                        </div>
-                      </button>
-
-                      {/* Botão de Download PDF */}
-                      <button
-                        onClick={handleExportPDF}
-                        disabled={isExportingPDF}
-                        className="group w-full p-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white flex items-center gap-4 transition-all active:scale-[0.98] shadow-lg shadow-red-100 hover:shadow-red-200 disabled:opacity-50 cursor-pointer text-left"
-                      >
-                        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
-                          <FileDown className="w-6 h-6 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-bold text-sm">
-                            {isExportingPDF ? 'Gerando PDF Oficial...' : 'Baixar PDF Oficial (.pdf)'}
-                          </div>
-                          <div className="text-[11px] text-red-100 truncate">Cópia perfeita em alta definição com timbrado</div>
-                        </div>
-                      </button>
-
-                      {/* Botão de Download DOCX */}
+                    <div className="flex flex-col gap-4">
                       <button
                         onClick={handleExport}
                         disabled={isExporting}
-                        className="group w-full p-4 rounded-2xl bg-[#2563eb] hover:bg-blue-700 text-white flex items-center gap-4 transition-all active:scale-[0.98] shadow-lg shadow-blue-100 hover:shadow-blue-200 disabled:opacity-50 cursor-pointer text-left"
+                        className="group w-full h-[80px] rounded-2xl bg-[#2563eb] text-white flex items-center px-6 gap-5 hover:bg-blue-700 transition-all active:scale-95 shadow-xl shadow-blue-100 disabled:opacity-50 cursor-pointer"
                       >
-                        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
-                          <FileText className="w-6 h-6 text-white" />
+                        <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                          💾
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-bold text-sm">
-                            {isExporting ? 'Gerando Word...' : 'Baixar Despacho Word (.docx)'}
-                          </div>
-                          <div className="text-[11px] text-blue-100 truncate">Documento editável para o Word</div>
+                        <div className="text-left">
+                          <div className="font-bold text-lg">{isExporting ? 'Gerando Word...' : 'Baixar Despacho (.docx)'}</div>
+                          <div className="text-[12px] opacity-70">Download automático iniciado</div>
                         </div>
                       </button>
                     </div>
 
-                    {/* Informações do Processo */}
-                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2 text-xs">
-                      <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
-                        Resumo do Despacho
-                      </div>
-                      <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
-                        <span className="text-slate-500">Credor:</span>
-                        <span className="font-bold text-slate-800 max-w-[220px] truncate text-right">{structuredData?.credor || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
-                        <span className="text-slate-500">Processo / NF:</span>
-                        <span className="font-bold text-slate-800">{structuredData?.num_processo || 'S/N'} / NF {structuredData?.num_nota_fiscal || 'S/N'}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
-                        <span className="text-slate-500">Secretaria:</span>
-                        <span className="font-bold text-slate-800 max-w-[200px] truncate text-right">{structuredData?.secretaria || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between items-center pt-1">
-                        <span className="text-slate-500">Valor Total:</span>
-                        <span className="font-bold text-emerald-600">
-                          {structuredData?.valor?.toString().startsWith('R$') ? structuredData?.valor : `R$ ${structuredData?.valor || '0,00'}`}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Ações Secundárias */}
-                    <div className="pt-2 border-t border-slate-100 grid grid-cols-3 gap-2">
-                      <button 
-                        onClick={goBackToSetup}
-                        className="h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-[11px] font-bold text-slate-700 transition-colors uppercase cursor-pointer"
-                      >
-                        Editar
-                      </button>
-                      <button 
-                        onClick={() => setShowRecentModal(true)}
-                        className="h-11 rounded-xl bg-blue-50 hover:bg-blue-100 text-[11px] font-bold text-blue-700 transition-colors uppercase cursor-pointer flex items-center justify-center gap-1"
-                      >
-                        <History className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Recentes</span>
-                      </button>
-                      <button 
-                        onClick={handleNewParecer}
-                        className="h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-[11px] font-bold text-slate-700 transition-colors uppercase cursor-pointer"
-                      >
-                        Novo
-                      </button>
+                    <div className="mt-8 pt-8 border-t border-[#f1f5f9]">
+                       <h3 className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-widest mb-4">Outras Opções</h3>
+                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                         <button 
+                           onClick={goBackToSetup}
+                           className="h-12 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
+                         >
+                           Editar Dados
+                         </button>
+                         <button 
+                           onClick={() => setShowRecentModal(true)}
+                           className="h-12 rounded-xl bg-blue-50 border border-blue-200 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition-colors uppercase cursor-pointer flex items-center justify-center gap-1.5"
+                         >
+                           <History className="w-3.5 h-3.5 text-blue-600" />
+                           <span>Recentes ({recentProcesses.length})</span>
+                         </button>
+                         <button 
+                           onClick={handleNewParecer}
+                           className="h-12 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors uppercase cursor-pointer"
+                         >
+                           Novo Despacho
+                         </button>
+                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Right: Live Interactive A4 Preview */}
-                <div className="h-full overflow-hidden min-h-[500px]">
-                  <DocumentPreview 
-                    structuredData={structuredData}
-                    onPrint={handleDirectPrint}
-                    onDownloadPDF={handleExportPDF}
-                    onDownloadDOCX={handleExport}
-                    isExportingPDF={isExportingPDF}
-                    isExportingDOCX={isExporting}
-                  />
+                  <div className="bg-slate-900 rounded-[24px] p-6 text-white shadow-xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                       <Layout className="w-20 h-20" />
+                    </div>
+                    <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Informação do Sistema</h4>
+                    <p className="text-[11px] text-slate-400 leading-relaxed mb-4">
+                      O documento gerado segue as normas vigentes do Controle Interno Municipal, com papel timbrado oficial embutido.
+                    </p>
+                    <div className="bg-slate-800 rounded-lg p-3 text-[10px] font-mono text-slate-500">
+                      ID: {structuredData?.num_processo || 'N/A'}-PRC
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -1404,8 +1398,8 @@ export default function App() {
       </div>
 
       {/* Print View Wrapper (hidden in normal UI) */}
-      <div className="print-only" id="hidden-despacho-element">
-        {structuredData && <OfficialDocumentContent structuredData={structuredData} />}
+      <div className="print-only">
+        {structuredData && <ReportDocument structuredData={structuredData} />}
       </div>
 
       {/* API Key Modal */}
